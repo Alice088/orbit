@@ -28,7 +28,12 @@ export function weekRangeLabel(days: { day: string }[] | undefined, weeksBack: n
   if (days && days.length > 0) {
     return `${formatShortDate(days[0].day)} – ${formatShortDate(days[days.length - 1].day)}`
   }
-  return weeksBack === 0 ? i18n.t("format.thisWeek") : i18n.t("format.weeksBack", { n: weeksBack })
+  const end = new Date()
+  end.setDate(end.getDate() - 7 * weeksBack)
+  const start = new Date(end)
+  start.setDate(start.getDate() - 6)
+  const fmt = (d: Date) => d.toLocaleDateString(localeTag(), { day: "numeric", month: "short" })
+  return `${fmt(start)} – ${fmt(end)}`
 }
 
 export function formatDateTime(iso: string): string {

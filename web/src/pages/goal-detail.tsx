@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import {
   ArrowLeft,
-  CalendarCheck,
   Check,
   CheckCircle2,
   ListChecks,
@@ -12,7 +11,7 @@ import {
 import { Link, useNavigate, useParams } from "react-router-dom"
 import { api } from "@/lib/api"
 import { formatNumber, formatDate } from "@/lib/format"
-import { difficultyLabel, goalStatusLabel } from "@/lib/labels"
+import { difficultyLabel, goalStatusLabel, milestoneClass, milestoneTitle } from "@/lib/labels"
 import { ProgressBar } from "@/components/shared/progress-bar"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { PageHeader } from "@/components/shared/page-header"
@@ -44,14 +43,6 @@ export default function GoalDetailPage() {
     queryKey: ["tasks"],
     queryFn: () => api.tasks.list(),
     select: (page) => (goalId ? page.items.filter((t) => t.goal_id === goalId) : page.items),
-  })
-
-  const review = useMutation({
-    mutationFn: () => api.goals.review(goalId!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["activity"] })
-      toast.success(t("goalDetail.reviewed"))
-    },
   })
 
   const completeTask = useMutation({
@@ -117,10 +108,6 @@ export default function GoalDetailPage() {
         description={t("goalDetail.created", { date: formatDate(g.created_at) })}
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={() => review.mutate()}>
-              <CalendarCheck className="size-4" />
-              {t("goalDetail.review")}
-            </Button>
             <TaskCreateDialog presetGoalId={g.id} />
             <PenaltyDialog />
             <ConfirmDialog
@@ -179,9 +166,14 @@ export default function GoalDetailPage() {
                 >
                   {reached && <Check className="size-3" />}
                 </div>
-                <span className="w-14 text-sm tabular-nums text-muted-foreground">
+                <span className="w-12 text-sm tabular-nums text-muted-foreground">
                   {m.percent}%
                 </span>
+                {milestoneTitle(m.percent) && (
+                  <span className={`text-sm font-medium ${milestoneClass(m.percent)}`}>
+                    {milestoneTitle(m.percent)}
+                  </span>
+                )}
                 <div className="h-px flex-1 bg-border" />
                 <span className="text-sm tabular-nums">{formatNumber(m.reward_points)} GPP</span>
               </div>

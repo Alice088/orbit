@@ -23,7 +23,8 @@ func (r *LedgerRepo) Insert(ctx context.Context, t *entity.PointTransaction) err
 
 type TransactionRow struct {
 	entity.PointTransaction
-	GoalTitle string
+	GoalTitle   string
+	SourceTitle string
 }
 
 func (r *LedgerRepo) SumGPPForGoal(ctx context.Context, userID string, goalID string) (int, error) {
@@ -44,9 +45,10 @@ func (r *LedgerRepo) SumXP(ctx context.Context, userID string) (int, error) {
 
 func (r *LedgerRepo) ListRecent(ctx context.Context, userID string, limit, offset int) ([]TransactionRow, error) {
 	rows, err := r.q.Query(ctx,
-		`SELECT pt.id, pt.currency, pt.amount, pt.reason, pt.goal_id, pt.domain_event_id, pt.created_at, COALESCE(g.title, '')
+		`SELECT pt.id, pt.currency, pt.amount, pt.reason, pt.goal_id, pt.domain_event_id, pt.created_at, COALESCE(g.title, ''), COALESCE(de.payload->>'title', '')
 		 FROM point_transactions pt
 		 LEFT JOIN goals g ON pt.goal_id = g.id
+		 LEFT JOIN domain_events de ON pt.domain_event_id = de.id
 		 WHERE pt.user_id = $1
 		 ORDER BY pt.created_at DESC LIMIT $2 OFFSET $3`, userID, limit, offset)
 	if err != nil {
@@ -56,7 +58,7 @@ func (r *LedgerRepo) ListRecent(ctx context.Context, userID string, limit, offse
 	var out []TransactionRow
 	for rows.Next() {
 		var t TransactionRow
-		if err := rows.Scan(&t.ID, &t.Currency, &t.Amount, &t.Reason, &t.GoalID, &t.DomainEventID, &t.CreatedAt, &t.GoalTitle); err != nil {
+		if err := rows.Scan(&t.ID, &t.Currency, &t.Amount, &t.Reason, &t.GoalID, &t.DomainEventID, &t.CreatedAt, &t.GoalTitle, &t.SourceTitle); err != nil {
 			return nil, err
 		}
 		out = append(out, t)

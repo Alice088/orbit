@@ -20,14 +20,12 @@ import (
 )
 
 var (
-	ErrValidation       = errors.New("validation failed")
-	ErrTaskCompleted    = errors.New("task already completed")
-	ErrMilestoneOrder   = errors.New("milestone_from must be below milestone_to")
-	ErrWrongOwner       = errors.New("resource belongs to another user")
-	ErrInactiveGoal     = errors.New("goal is not active")
-	ErrMissingMilestone = errors.New("goal requires 0% and 100% milestones")
-	ErrAccountNotFound  = errors.New("аккаунт с таким именем не найден")
-	ErrHabitDoneToday   = errors.New("привычка уже выполнена сегодня")
+	ErrValidation     = errors.New("validation failed")
+	ErrTaskCompleted  = errors.New("task already completed")
+	ErrWrongOwner     = errors.New("resource belongs to another user")
+	ErrInactiveGoal   = errors.New("goal is not active")
+	ErrAccountNotFound = errors.New("аккаунт с таким именем не найден")
+	ErrHabitDoneToday = errors.New("привычка уже выполнена сегодня")
 )
 
 const maxMilestoneRepeatLevel = 99999999
@@ -51,11 +49,6 @@ func NewService(pool *pgxpool.Pool, cfg GameSettings) (*Service, error) {
 		return nil, err
 	}
 	return &Service{pool: pool, cfg: cfg, loc: loc}, nil
-}
-
-type MilestoneInput struct {
-	Percent      int
-	RewardPoints int
 }
 
 type StreakMilestoneInput struct {
@@ -109,13 +102,15 @@ type CategoryStat struct {
 }
 
 type Transaction struct {
-	ID        string
-	Currency  entity.Currency
-	Amount    int
-	Reason    string
-	GoalID    *string
-	GoalTitle string
-	CreatedAt time.Time
+	ID            string
+	Currency      entity.Currency
+	Amount        int
+	Reason        string
+	GoalID        *string
+	GoalTitle     string
+	SourceTitle   string
+	DomainEventID *string
+	CreatedAt     time.Time
 }
 
 type Analytics struct {
@@ -151,12 +146,11 @@ func dayKey(t time.Time) string {
 	return t.Format("2006-01-02")
 }
 
-func (s *Service) CreateGoal(ctx context.Context, userID string, title string, totalGPP int, milestones []MilestoneInput) (*entity.Goal, error) {
-	if totalGPP <= 0 || len(milestones) < 2 {
+var goalMilestonePercents = []int{1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
+
+func (s *Service) CreateGoal(ctx context.Context, userID string, title string, totalGPP int) (*entity.Goal, error) {
+	if totalGPP <= 0 {
 		return nil, ErrValidation
-	}
-	if err := validateMilestones(milestones, totalGPP); err != nil {
-		return nil, err
 	}
 	var goal *entity.Goal
 	err := s.withTx(ctx, func(tx pgx.Tx) error {
@@ -165,8 +159,8 @@ func (s *Service) CreateGoal(ctx context.Context, userID string, title string, t
 		if err := store.Goal.Create(ctx, g); err != nil {
 			return err
 		}
-		for _, m := range milestones {
-			ms := &entity.Milestone{GoalID: g.ID, Percent: m.Percent, RewardPoints: m.RewardPoints}
+		for _, pct := range goalMilestonePercents {
+			ms := &entity.Milestone{GoalID: g.ID, Percent: pct, RewardPoints: (totalGPP*pct + 50) / 100}
 			if err := store.Goal.CreateMilestone(ctx, ms); err != nil {
 				return err
 			}
@@ -183,32 +177,6 @@ func (s *Service) CreateGoal(ctx context.Context, userID string, title string, t
 		return nil
 	})
 	return goal, err
-}
-
-func validateMilestones(milestones []MilestoneInput, totalGPP int) error {
-	hasZero := false
-	hasHundred := false
-	for i, m := range milestones {
-		if m.Percent < 0 || m.Percent > 100 || m.RewardPoints < 0 {
-			return ErrValidation
-		}
-		if i > 0 && m.Percent <= milestones[i-1].Percent {
-			return ErrValidation
-		}
-		if m.Percent == 0 {
-			hasZero = true
-		}
-		if m.Percent == 100 {
-			hasHundred = true
-			if m.RewardPoints != totalGPP {
-				return ErrValidation
-			}
-		}
-	}
-	if !hasZero || !hasHundred {
-		return ErrMissingMilestone
-	}
-	return nil
 }
 
 func (s *Service) CreateTask(ctx context.Context, userID string, goalID string, title string, gppReward int, difficulty string) (*entity.Task, error) {
@@ -274,7 +242,7 @@ func (s *Service) CompleteTask(ctx context.Context, userID string, taskID string
 		ev := &entity.DomainEvent{
 			UserID: userID, EventType: entity.EventTaskCompleted,
 			AggregateType: "task", AggregateID: &task.ID,
-			Payload: map[string]any{"goal_id": task.GoalID, "gpp": gpp, "xp": xp},
+			Payload: map[string]any{"title": task.Title, "goal_id": task.GoalID, "gpp": gpp, "xp": xp},
 		}
 		if err := store.Event.Insert(ctx, ev); err != nil {
 			return err
@@ -728,7 +696,7 @@ func (s *Service) ListTransactions(ctx context.Context, userID string, limit, of
 	for _, r := range rows {
 		out = append(out, Transaction{
 			ID: r.ID, Currency: r.Currency, Amount: r.Amount, Reason: r.Reason,
-			GoalID: r.GoalID, GoalTitle: r.GoalTitle, CreatedAt: r.CreatedAt,
+			GoalID: r.GoalID, GoalTitle: r.GoalTitle, SourceTitle: r.SourceTitle, DomainEventID: r.DomainEventID, CreatedAt: r.CreatedAt,
 		})
 	}
 	total, err := store.Ledger.Count(ctx, userID)
@@ -907,6 +875,11 @@ func (s *Service) DeleteHabit(ctx context.Context, userID string, habitID string
 func (s *Service) ListGoals(ctx context.Context, userID string) ([]entity.Goal, error) {
 	store := repository.NewStore(s.pool)
 	return store.Goal.ListByUser(ctx, userID)
+}
+
+func (s *Service) GoalMilestonesByIDs(ctx context.Context, goalIDs []string) ([]entity.Milestone, error) {
+	store := repository.NewStore(s.pool)
+	return store.Goal.MilestonesByGoalIDs(ctx, goalIDs)
 }
 
 func (s *Service) ListHabits(ctx context.Context, userID string) ([]entity.Habit, error) {

@@ -75,8 +75,6 @@ func weeksParam(r *http.Request) int {
 func statusFor(err error) int {
 	switch {
 	case errors.Is(err, service.ErrValidation),
-		errors.Is(err, service.ErrMilestoneOrder),
-		errors.Is(err, service.ErrMissingMilestone),
 		errors.Is(err, service.ErrInactiveGoal):
 		return http.StatusBadRequest
 	case errors.Is(err, service.ErrTaskCompleted),
@@ -139,11 +137,7 @@ func (h *GoalHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	milestones := make([]service.MilestoneInput, 0, len(req.Milestones))
-	for _, m := range req.Milestones {
-		milestones = append(milestones, service.MilestoneInput{Percent: m.Percent, RewardPoints: m.RewardPoints})
-	}
-	goal, err := h.svc.CreateGoal(r.Context(), middleware.GetUserID(r.Context()), req.Title, req.TotalGPP, milestones)
+	goal, err := h.svc.CreateGoal(r.Context(), middleware.GetUserID(r.Context()), req.Title, req.TotalGPP)
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -157,9 +151,24 @@ func (h *GoalHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, statusFor(err), err.Error())
 		return
 	}
+	ids := make([]string, 0, len(goals))
+	for i := range goals {
+		ids = append(ids, goals[i].ID)
+	}
+	byGoal := map[string][]entity.Milestone{}
+	if len(ids) > 0 {
+		ms, err := h.svc.GoalMilestonesByIDs(r.Context(), ids)
+		if err != nil {
+			writeError(w, statusFor(err), err.Error())
+			return
+		}
+		for _, m := range ms {
+			byGoal[m.GoalID] = append(byGoal[m.GoalID], m)
+		}
+	}
 	out := make([]dto.GoalResponse, 0, len(goals))
 	for i := range goals {
-		out = append(out, goalToResponse(&goals[i], nil))
+		out = append(out, goalToResponse(&goals[i], byGoal[goals[i].ID]))
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -499,7 +508,7 @@ func (h *StatsHandler) Transactions(w http.ResponseWriter, r *http.Request) {
 	for _, t := range txs {
 		res := dto.TransactionResponse{
 			ID: t.ID, Currency: string(t.Currency), Amount: t.Amount, Reason: t.Reason,
-			GoalID: t.GoalID, GoalTitle: t.GoalTitle,
+			GoalID: t.GoalID, GoalTitle: t.GoalTitle, SourceTitle: t.SourceTitle, DomainEventID: t.DomainEventID,
 			CreatedAt: t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 		out = append(out, res)

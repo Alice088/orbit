@@ -5,6 +5,7 @@ import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { api } from "@/lib/api"
 import { formatNumber, formatShortDate, greeting, weekRangeLabel } from "@/lib/format"
+import { milestoneClass, milestoneTitle } from "@/lib/labels"
 import { MetricCard } from "@/components/shared/metric-card"
 import { ActivityItem } from "@/components/shared/activity-item"
 import { ProgressBar } from "@/components/shared/progress-bar"
@@ -210,9 +211,26 @@ export default function DashboardPage() {
                   return (
                     <Link key={g.id} to={`/goals/${g.id}`} className="group block">
                       <div className="mb-1.5 flex items-center justify-between gap-3">
-                        <p className="truncate text-sm font-medium group-hover:underline">
-                          {g.title}
-                        </p>
+                        <div className="flex min-w-0 items-center">
+                          <p className="truncate text-sm font-medium group-hover:underline">
+                            {g.title}
+                            {(() => {
+                              const current = (g.milestones ?? [])
+                                .filter((m) => m.percent <= percent)
+                                .sort((a, b) => b.percent - a.percent)[0]
+                              return current ? (
+                                <>
+                                  {" · "}
+                                  <span
+                                    className={`font-medium ${milestoneClass(current.percent)}`}
+                                  >
+                                    {milestoneTitle(current.percent)}
+                                  </span>
+                                </>
+                              ) : null
+                            })()}
+                          </p>
+                        </div>
                         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                           {percent}%
                         </span>

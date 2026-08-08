@@ -39,6 +39,36 @@ export function achievementTitle(code: string): string {
   return title
 }
 
+export function milestoneTitle(percent: number): string {
+  if (!i18n.exists(`labels.milestone.${percent}`)) return ""
+  return i18n.t(`labels.milestone.${percent}`)
+}
+
+export function milestoneClass(percent: number): string {
+  switch (percent) {
+    case 1:
+      return "text-[#8b5a2b] dark:text-[#b08968]"
+    case 10:
+    case 20:
+      return "text-[#b87333] dark:text-[#d9a05b]"
+    case 30:
+    case 40:
+      return "text-[#8e949c] dark:text-[#cfd4da]"
+    case 50:
+    case 60:
+      return "milestone-shimmer bg-gradient-to-r from-yellow-300 via-amber-500 to-yellow-300 bg-clip-text text-transparent"
+    case 70:
+    case 80:
+      return "milestone-shimmer bg-gradient-to-r from-zinc-500 via-zinc-300 to-zinc-500 bg-clip-text text-transparent"
+    case 90:
+      return "milestone-shimmer bg-gradient-to-r from-sky-300 via-cyan-500 to-sky-300 bg-clip-text text-transparent"
+    case 100:
+      return "milestone-shimmer bg-gradient-to-r from-[#ff7d95] via-[#ffd94d] via-[#5fe88f] via-[#6db8ff] to-[#b78aff] bg-clip-text text-transparent"
+    default:
+      return ""
+  }
+}
+
 export function eventDescription(event: {
   event_type: string
   payload: Record<string, unknown>
@@ -46,6 +76,8 @@ export function eventDescription(event: {
   switch (event.event_type) {
     case "task_completed": {
       const parts: string[] = []
+      if (typeof event.payload.title === "string" && event.payload.title)
+        parts.push(event.payload.title)
       if (typeof event.payload.gpp === "number" && event.payload.gpp > 0)
         parts.push(`+${event.payload.gpp} GPP`)
       if (typeof event.payload.xp === "number" && event.payload.xp > 0)

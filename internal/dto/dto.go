@@ -12,15 +12,9 @@ type AuthResponse struct {
 	AccessToken string `json:"access_token"`
 }
 
-type MilestoneRequest struct {
-	Percent      int `json:"percent"`
-	RewardPoints int `json:"reward_points"`
-}
-
 type CreateGoalRequest struct {
-	Title      string             `json:"title"`
-	TotalGPP   int                `json:"total_gpp"`
-	Milestones []MilestoneRequest `json:"milestones"`
+	Title    string `json:"title"`
+	TotalGPP int    `json:"total_gpp"`
 }
 
 type CreateTaskRequest struct {
@@ -162,13 +156,15 @@ type AnalyticsResponse struct {
 }
 
 type TransactionResponse struct {
-	ID        string  `json:"id"`
-	Currency  string  `json:"currency"`
-	Amount    int     `json:"amount"`
-	Reason    string  `json:"reason"`
-	GoalID    *string `json:"goal_id,omitempty"`
-	GoalTitle string  `json:"goal_title,omitempty"`
-	CreatedAt string  `json:"created_at"`
+	ID            string  `json:"id"`
+	Currency      string  `json:"currency"`
+	Amount        int     `json:"amount"`
+	Reason        string  `json:"reason"`
+	GoalID        *string `json:"goal_id,omitempty"`
+	GoalTitle     string  `json:"goal_title,omitempty"`
+	SourceTitle   string  `json:"source_title,omitempty"`
+	DomainEventID *string `json:"domain_event_id,omitempty"`
+	CreatedAt     string  `json:"created_at"`
 }
 
 type ActivityResponse struct {

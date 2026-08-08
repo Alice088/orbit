@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowRight, Plus, Target, Trash2 } from "lucide-react"
+import { ArrowRight, Plus, Target } from "lucide-react"
 import { Link } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { api, ApiError, type Goal, type GoalProgress } from "@/lib/api"
@@ -26,40 +26,21 @@ import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
-interface MilestoneRow {
-  percent: string
-}
-
-function autoReward(percent: number, total: number): number {
-  return Math.round((percent * total) / 100)
-}
-
 function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
   const queryClient = useQueryClient()
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [total, setTotal] = useState("1000")
-  const [rows, setRows] = useState<MilestoneRow[]>([
-    { percent: "0" },
-    { percent: "10" },
-    { percent: "20" },
-    { percent: "100" },
-  ])
   const [error, setError] = useState("")
 
   const totalNum = Number(total) || 0
-  const rewardFor = (percent: number) => autoReward(percent, totalNum)
 
   const mutation = useMutation({
     mutationFn: () =>
       api.goals.create({
         title,
         total_gpp: totalNum,
-        milestones: rows.map((r) => ({
-          percent: Number(r.percent),
-          reward_points: autoReward(Number(r.percent), totalNum),
-        })),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["goals"] })
@@ -75,45 +56,11 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
   function submit(e: React.FormEvent) {
     e.preventDefault()
     setError("")
-    const parsed = rows.map((r) => ({
-      percent: Number(r.percent),
-      reward: autoReward(Number(r.percent), totalNum),
-    }))
     if (!title.trim() || totalNum <= 0) {
       setError(t("goals.errFill"))
       return
     }
-    if (parsed.some((r) => !Number.isFinite(r.percent) || !Number.isFinite(r.reward))) {
-      setError(t("goals.errNumbers"))
-      return
-    }
-    const hasZero = parsed.some((r) => r.percent === 0)
-    const hasHundred = parsed.some((r) => r.percent === 100)
-    if (!hasZero || !hasHundred) {
-      setError(t("goals.errZeroHundred"))
-      return
-    }
-    const hundred = parsed.find((r) => r.percent === 100)
-    if (hundred && hundred.reward !== totalNum) {
-      setError(t("goals.errHundredReward"))
-      return
-    }
-    const sorted = [...parsed].sort((a, b) => a.percent - b.percent)
-    for (let i = 1; i < sorted.length; i++) {
-      if (sorted[i].percent <= sorted[i - 1].percent) {
-        setError(t("goals.errAscending"))
-        return
-      }
-      if (sorted[i].reward <= sorted[i - 1].reward) {
-        setError(t("goals.errCollision"))
-        return
-      }
-    }
     mutation.mutate()
-  }
-
-  function setRow(index: number, field: keyof MilestoneRow, value: string) {
-    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [field]: value } : r)))
   }
 
   return (
@@ -150,55 +97,6 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
               value={total}
               onChange={(e) => setTotal(e.target.value)}
             />
-          </div>
-          <div className="flex flex-col gap-2">
-            <Label>{t("goals.milestones")}</Label>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {t("goals.milestoneHint")}
-            </p>
-            <div className="flex flex-col gap-2">
-              {rows.map((row, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={row.percent}
-                    onChange={(e) => setRow(i, "percent", e.target.value)}
-                    className="w-20"
-                    aria-label={t("goals.percentAria")}
-                  />
-                  <span className="text-sm text-muted-foreground">% →</span>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={String(rewardFor(Number(row.percent)))}
-                    disabled
-                    className="flex-1"
-                    aria-label={t("goals.rewardAria")}
-                  />
-                  <span className="w-8 text-sm text-muted-foreground">GPP</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
-                    aria-label={t("goals.removeMilestoneAria")}
-                  >
-                    <Trash2 className="size-4" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setRows((prev) => [...prev, { percent: "" }])}
-            >
-              <Plus className="size-4" />
-              {t("goals.addMilestone")}
-            </Button>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>

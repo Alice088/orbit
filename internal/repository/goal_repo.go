@@ -68,6 +68,25 @@ func (r *GoalRepo) Milestones(ctx context.Context, goalID string) ([]entity.Mile
 	return out, rows.Err()
 }
 
+func (r *GoalRepo) MilestonesByGoalIDs(ctx context.Context, goalIDs []string) ([]entity.Milestone, error) {
+	rows, err := r.q.Query(ctx,
+		`SELECT id, goal_id, percent, reward_points FROM milestones
+		 WHERE goal_id = ANY($1::uuid[]) ORDER BY percent`, goalIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []entity.Milestone
+	for rows.Next() {
+		var m entity.Milestone
+		if err := rows.Scan(&m.ID, &m.GoalID, &m.Percent, &m.RewardPoints); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
 func (r *GoalRepo) MilestoneByID(ctx context.Context, id string) (*entity.Milestone, error) {
 	row := r.q.QueryRow(ctx,
 		`SELECT id, goal_id, percent, reward_points FROM milestones WHERE id = $1`, id)

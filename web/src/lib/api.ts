@@ -195,6 +195,8 @@ export interface Transaction {
   reason: string
   goal_id?: string
   goal_title?: string
+  source_title?: string
+  domain_event_id?: string
   created_at: string
 }
 
@@ -230,7 +232,7 @@ export const api = {
 
   goals: {
     list: () => get<Goal[]>("/v1/goals"),
-    create: (body: { title: string; total_gpp: number; milestones: { percent: number; reward_points: number }[] }) =>
+    create: (body: { title: string; total_gpp: number }) =>
       post<Goal>("/v1/goals", body),
     detail: (id: string) => get<Goal>(`/v1/goals/${id}`),
     progress: (id: string) => get<GoalProgress>(`/v1/goals/${id}/progress`),

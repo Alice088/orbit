@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Coins, Sparkles, Target, TrendingUp } from "lucide-react"
+import { ChevronDown, ChevronRight, Coins, Sparkles, Target, TrendingUp } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { api, type Transaction } from "@/lib/api"
 import { formatNumber, formatDateTime } from "@/lib/format"
@@ -39,9 +39,108 @@ function Amount({ amount }: { amount: number }) {
 
 function CurrencyPill({ currency }: { currency: string }) {
   return (
-    <span className="inline-flex w-10 items-center justify-center rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+    <span className="inline-flex min-w-10 items-center justify-center rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
       {currencyLabel(currency)}
     </span>
+  )
+}
+
+function txDescription(tx: Transaction): string {
+  const base = reasonLabel(tx.reason)
+  if (tx.reason === "habit_completed" || !tx.source_title) return base
+  return `${base} · ${tx.source_title}`
+}
+
+function txGoal(tx: Transaction): string {
+  if (tx.reason === "habit_completed") return tx.source_title || "—"
+  return tx.goal_title || "—"
+}
+
+function TxRow({ tx }: { tx: Transaction }) {
+  return (
+    <TableRow>
+      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+        {formatDateTime(tx.created_at)}
+      </TableCell>
+      <TableCell className="text-sm">{txDescription(tx)}</TableCell>
+      <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+        {txGoal(tx)}
+      </TableCell>
+      <TableCell className="text-right">
+        <Amount amount={tx.amount} />
+      </TableCell>
+      <TableCell className="text-right">
+        <CurrencyPill currency={tx.currency} />
+      </TableCell>
+    </TableRow>
+  )
+}
+
+function TxGroupRow({ group }: { group: Transaction[] }) {
+  const [open, setOpen] = useState(false)
+  const first = group[0]
+  const gppTxs = group.filter((t) => t.currency === "gpp")
+  const xpTxs = group.filter((t) => t.currency === "xp")
+  const primaryTxs = gppTxs.length > 0 ? gppTxs : xpTxs
+  const currency = gppTxs.length > 0 ? "gpp" : "xp"
+  const total = primaryTxs.reduce((s, t) => s + t.amount, 0)
+  const expandable = gppTxs.length > 0 && xpTxs.length > 0
+
+  if (!expandable) {
+    return (
+      <TableRow>
+        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+          {formatDateTime(first.created_at)}
+        </TableCell>
+        <TableCell className="text-sm">{txDescription(first)}</TableCell>
+        <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+          {txGoal(first)}
+        </TableCell>
+        <TableCell className="text-right">
+          <Amount amount={total} />
+        </TableCell>
+        <TableCell className="text-right">
+          <CurrencyPill currency={currency} />
+        </TableCell>
+      </TableRow>
+    )
+  }
+
+  return (
+    <>
+      <TableRow onClick={() => setOpen((v) => !v)} className="cursor-pointer">
+        <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-1">
+            {open ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+            {formatDateTime(first.created_at)}
+          </span>
+        </TableCell>
+        <TableCell className="text-sm font-medium">{txDescription(first)}</TableCell>
+        <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
+          {txGoal(first)}
+        </TableCell>
+        <TableCell className="text-right">
+          <Amount amount={total} />
+        </TableCell>
+        <TableCell className="text-right">
+          <CurrencyPill currency={currency} />
+        </TableCell>
+      </TableRow>
+      {open &&
+        xpTxs.map((t) => (
+          <TableRow key={t.id} className="bg-muted/40">
+            <TableCell />
+            <TableCell />
+            <TableCell />
+            <TableCell className="text-right">
+              <Amount amount={t.amount} />
+            </TableCell>
+            <TableCell className="text-right">
+              <CurrencyPill currency={t.currency} />
+            </TableCell>
+          </TableRow>
+        ))}
+    </>
   )
 }
 
@@ -56,6 +155,17 @@ export default function PointsPage() {
     queryKey: ["transactions", page],
     queryFn: () => api.stats.transactions(limit, (page - 1) * limit),
   })
+
+  const groups = useMemo(() => {
+    const map = new Map<string, Transaction[]>()
+    for (const tx of txs.data?.items ?? []) {
+      const key = tx.domain_event_id ?? tx.id
+      const arr = map.get(key)
+      if (arr) arr.push(tx)
+      else map.set(key, [tx])
+    }
+    return [...map.values()]
+  }, [txs.data])
 
   const lastWeekXP = week.data?.total_xp ?? 0
   const trend =
@@ -125,23 +235,13 @@ export default function PointsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {txs.data.items.map((tx: Transaction) => (
-                  <TableRow key={tx.id}>
-                    <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                      {formatDateTime(tx.created_at)}
-                    </TableCell>
-                    <TableCell className="text-sm">{reasonLabel(tx.reason)}</TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                      {tx.goal_title || "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Amount amount={tx.amount} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <CurrencyPill currency={tx.currency} />
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {groups.map((g) =>
+                  g.length > 1 ? (
+                    <TxGroupRow key={g[0].id} group={g} />
+                  ) : (
+                    <TxRow key={g[0].id} tx={g[0]} />
+                  ),
+                )}
               </TableBody>
             </Table>
           )}
