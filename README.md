@@ -5,7 +5,7 @@ A self-hosted gamified personal life OS. Single-user, two progress dimensions: *
 ## Quick Start
 
 ```bash
-docker compose up --build -d
+git clone git@github.com:Alice088/orbit.git && cd ./orbit && docker compose up --build -d && echo "You're welcome: http://localhost:8081"
 ```
 
 - Web UI: http://localhost:8081
