@@ -17,7 +17,7 @@ const (
 )
 
 // JWTAuth returns middleware that validates a Bearer JWT token.
-func JWTAuth(jwtManager *auth.JWTManager) func(http.Handler) http.Handler {
+func JWTAuth(jwtManager *auth.JWTManager, userExists func(context.Context, string) bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authHeader := r.Header.Get("Authorization")
@@ -34,6 +34,11 @@ func JWTAuth(jwtManager *auth.JWTManager) func(http.Handler) http.Handler {
 
 			claims, err := jwtManager.ValidateToken(parts[1])
 			if err != nil {
+				http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
+				return
+			}
+
+			if !userExists(r.Context(), claims.UserID) {
 				http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
 				return
 			}

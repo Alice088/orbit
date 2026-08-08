@@ -28,7 +28,7 @@ func NewRouter(healthHandler *handler.HealthHandler, handlers *handler.Handlers,
 		r.Post("/auth/session", handlers.Auth.Session)
 
 		r.Group(func(r chi.Router) {
-			r.Use(middleware.JWTAuth(jwtManager))
+			r.Use(middleware.JWTAuth(jwtManager, handlers.Auth.UserExists))
 
 			r.Get("/me", handlers.Auth.Me)
 

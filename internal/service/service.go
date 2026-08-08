@@ -434,7 +434,7 @@ func (s *Service) CompleteHabit(ctx context.Context, userID string, habitID stri
 			UserID: userID, EventType: entity.EventHabitCompleted,
 			AggregateType: "habit", AggregateID: &habitID,
 			Payload: map[string]any{
-				"base_xp": habit.BaseXP, "bonus_xp": bonus, "awarded": baseAwarded + bonusAwarded,
+				"title": habit.Title, "base_xp": habit.BaseXP, "bonus_xp": bonus, "awarded": baseAwarded + bonusAwarded,
 				"streak_days": state.CurrentDays,
 			},
 		}

@@ -17,9 +17,7 @@ import SettingsPage from "@/pages/settings"
 type AuthState = "loading" | "authed" | "anon"
 
 function useAuthed(): AuthState {
-  const [state, setState] = useState<AuthState>(() =>
-    getToken() ? "authed" : "loading",
-  )
+  const [state, setState] = useState<AuthState>("loading")
   useEffect(() => {
     const onUnauthorized = () => setState("anon")
     const onAuthed = () => setState("authed")
@@ -31,16 +29,27 @@ function useAuthed(): AuthState {
     }
   }, [])
   useEffect(() => {
+    let cancelled = false
+    const finish = (next: AuthState) => {
+      if (!cancelled) setState(next)
+    }
     if (getToken()) {
-      setState("authed")
-      return
+      api
+        .me()
+        .then(() => finish("authed"))
+        .catch(() => {
+          setToken(null)
+          finish("anon")
+        })
+      return () => {
+        cancelled = true
+      }
     }
     const name = getStoredName()
     if (!name) {
-      setState("anon")
+      finish("anon")
       return
     }
-    let cancelled = false
     api
       .session(name)
       .then((res) => {
@@ -48,9 +57,7 @@ function useAuthed(): AuthState {
         setToken(res.access_token)
         window.dispatchEvent(new Event("orbit:authed"))
       })
-      .catch(() => {
-        if (!cancelled) setState("anon")
-      })
+      .catch(() => finish("anon"))
     return () => {
       cancelled = true
     }

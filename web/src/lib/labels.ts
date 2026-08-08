@@ -56,16 +56,22 @@ export function eventDescription(event: {
       return typeof event.payload.amount === "number" ? `−${event.payload.amount} GPP` : ""
     case "habit_completed": {
       const parts: string[] = []
+      if (typeof event.payload.title === "string" && event.payload.title)
+        parts.push(event.payload.title)
       if (typeof event.payload.awarded === "number" && event.payload.awarded > 0)
         parts.push(`+${event.payload.awarded} XP`)
       if (typeof event.payload.streak_days === "number" && event.payload.streak_days > 0)
         parts.push(i18n.t("labels.streakDays", { count: event.payload.streak_days }))
       return parts.join(" · ")
     }
-    case "goal_created":
-      return typeof event.payload.total_gpp === "number"
-        ? `${event.payload.total_gpp} GPP`
-        : ""
+    case "goal_created": {
+      const parts: string[] = []
+      if (typeof event.payload.title === "string" && event.payload.title)
+        parts.push(event.payload.title)
+      if (typeof event.payload.total_gpp === "number" && event.payload.total_gpp > 0)
+        parts.push(`${event.payload.total_gpp} GPP`)
+      return parts.join(" · ")
+    }
     case "daily_settlement":
     case "inactivity_penalty":
       return "-10 XP"

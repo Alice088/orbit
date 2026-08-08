@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -93,6 +94,11 @@ func statusFor(err error) int {
 type AuthHandler struct {
 	svc *service.Service
 	jwt *auth.JWTManager
+}
+
+func (h *AuthHandler) UserExists(ctx context.Context, userID string) bool {
+	_, err := h.svc.Me(ctx, userID)
+	return err == nil
 }
 
 func (h *AuthHandler) Session(w http.ResponseWriter, r *http.Request) {
