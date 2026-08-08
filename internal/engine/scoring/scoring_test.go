@@ -34,13 +34,13 @@ func TestTaskXP(t *testing.T) {
 		difficulty string
 		want       int
 	}{
-		{"normal", 100, "normal", 10},
-		{"hard", 100, "hard", 15},
-		{"epic", 100, "epic", 20},
-		{"easy", 100, "easy", 5},
-		{"rounding", 15, "hard", 1},
-		{"unknown difficulty defaults to normal", 100, "insane", 10},
-		{"zero gpp", 0, "epic", 0},
+		{"normal", 3, "normal", 3},
+		{"hard", 3, "hard", 4},
+		{"epic", 5, "epic", 10},
+		{"easy", 5, "easy", 2},
+		{"minimum one", 1, "easy", 1},
+		{"unknown difficulty defaults to normal", 4, "insane", 4},
+		{"zero gpp", 0, "epic", 1},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

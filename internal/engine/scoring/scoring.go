@@ -31,5 +31,9 @@ func GPP(milestoneTo int, milestoneFrom int, contributionCoef int) int {
 }
 
 func TaskXP(gpp int, difficulty string) int {
-	return gpp / 10 * DifficultyMultiplier(difficulty) / 100
+	xp := gpp * DifficultyMultiplier(difficulty) / 100
+	if xp < 1 {
+		return 1
+	}
+	return xp
 }

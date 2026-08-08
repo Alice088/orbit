@@ -1,30 +1,43 @@
 services:
 
   db:
-    container_name: golang-database 
+    container_name: orbit-db
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: golang
-      POSTGRES_PASSWORD: golang
-      POSTGRES_DB: golang
+      POSTGRES_USER: orbit
+      POSTGRES_PASSWORD: orbit
+      POSTGRES_DB: orbit
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U orbit -d orbit"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
 
-  backend:
-    container_name: golang-backend
-    image: docker/golang-backend:v1.0.0
-    restart: unless-stopped
+  migrate:
+    image: migrate/migrate
+    restart: "no"
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://orbit:orbit@db:5432/orbit?sslmode=disable"
+      - "up"
+
+  backend:
+    build: .
+    container_name: orbit-backend
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     environment:
       SERVER_HOST: 0.0.0.0
       SERVER_PORT: 8080
@@ -33,21 +46,22 @@ services:
 
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: golang
-      DB_PASSWORD: golang
-      DB_NAME: golang
+      DB_USER: orbit
+      DB_PASSWORD: orbit
+      DB_NAME: orbit
       DB_SSLMODE: disable
 
-      LOG_LEVEL: warn
-      LOG_FORMAT: pretty
+      LOG_LEVEL: info
+      LOG_FORMAT: json
 
-      JWT_SECRET_KEY: secret
-      JWT_ACCESS_EXPIRY: 15m
+      JWT_SECRET_KEY: orbit-dev-secret-change-me
+      JWT_ACCESS_EXPIRY: 24h
       JWT_REFRESH_EXPIRY: 168h
 
-      STORAGE_DOCUMENTS_DIR: /app/documents
-    volumes:
-      - documents:/app/documents
+      GAME_TIMEZONE: Europe/Moscow
+      GAME_DAILY_HABIT_CAP: 50
+      GAME_MISSED_TWICE_PENALTY_XP: 3
+      GAME_INACTIVITY_PENALTY_XP: 3
     ports:
       - "8080:8080"
     healthcheck:
@@ -55,9 +69,25 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 5s
+
+  web:
+    build: ./web
+    container_name: orbit-web
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8081:80"
 
 volumes:
   pgdata:
-  documents:
 
+networks:
+  default:
+    name: orbit_default
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

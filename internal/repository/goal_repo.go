@@ -108,3 +108,8 @@ func (r *GoalRepo) SetStatus(ctx context.Context, id string, status entity.GoalS
 		 WHERE id = $1`, id, status)
 	return err
 }
+
+func (r *GoalRepo) Delete(ctx context.Context, id string) error {
+	_, err := r.q.Exec(ctx, `DELETE FROM goals WHERE id = $1`, id)
+	return err
+}

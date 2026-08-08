@@ -38,7 +38,7 @@ Read models / stats (daily_stats)
 | Currency | Scope       | Source                                          | Goes to        |
 | -------- | ----------- | ----------------------------------------------- | -------------- |
 | GPP      | per goal    | milestone delta × contribution_coef             | goal progress  |
-| XP       | global      | gpp/10 × difficulty_multiplier; habit base_xp   | levels         |
+| XP       | global      | gpp × difficulty_multiplier (min 1); habit base_xp | levels         |
 
 Integer math only, rounding down.
 
@@ -74,23 +74,29 @@ achievements.
 
 | Method | Path                    | Purpose                        |
 | ------ | ----------------------- | ------------------------------ |
-| POST   | /auth/login             | owner login                    |
+| POST   | /auth/session           | owner login by name (auto-provision on first run) |
 | POST   | /goals                  | create goal                    |
 | GET    | /goals                  | list goals                     |
 | GET    | /goals/{id}             | goal detail                    |
 | GET    | /goals/{id}/progress    | goal progress                  |
 | POST   | /goals/{id}/review      | goal review (activity event)   |
+| DELETE | /goals/{id}             | delete goal + tasks (XP kept)  |
 | POST   | /tasks                  | create task                    |
 | POST   | /tasks/{id}/complete    | complete task (+GPP, +XP)      |
-| POST   | /tasks/{id}/regress     | task regression (−GPP)         |
 | POST   | /habits                 | create habit                   |
 | POST   | /habits/{id}/complete   | complete habit (+XP, streak)   |
+| DELETE | /habits/{id}            | delete habit (XP kept)         |
 | GET    | /streaks                | streak states                  |
 | POST   | /checkin                | manual check-in (activity)     |
+| POST   | /penalties              | manual penalty (XP/GPP, reason) |
 | GET    | /stats/today            | today's stats                  |
 | GET    | /stats/week             | weekly stats                   |
 | GET    | /levels/current         | current level and XP           |
 | GET    | /analytics/overview     | category efficiency, ratio, rebalance suggestion |
+| GET    | /tasks                  | list tasks                     |
+| DELETE | /tasks/{id}             | delete task (completed → XP/GPP recalc) |
+| GET    | /activity               | recent domain events           |
+| GET    | /transactions           | ledger history                 |
 
 ## Scheduler
 

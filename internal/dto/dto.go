@@ -1,13 +1,11 @@
 package dto
 
 type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Name string `json:"name"`
 }
 
-type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+type MeResponse struct {
+	Name string `json:"name"`
 }
 
 type AuthResponse struct {
@@ -26,12 +24,10 @@ type CreateGoalRequest struct {
 }
 
 type CreateTaskRequest struct {
-	GoalID           string `json:"goal_id"`
-	Title            string `json:"title"`
-	MilestoneFromID  string `json:"milestone_from_id"`
-	MilestoneToID    string `json:"milestone_to_id"`
-	ContributionCoef int    `json:"contribution_coef"`
-	Difficulty       string `json:"difficulty"`
+	GoalID     string `json:"goal_id"`
+	Title      string `json:"title"`
+	GPPReward  int    `json:"gpp_reward"`
+	Difficulty string `json:"difficulty"`
 }
 
 type StreakMilestoneRequest struct {
@@ -48,12 +44,15 @@ type CreateHabitRequest struct {
 	Milestones     []StreakMilestoneRequest `json:"milestones"`
 }
 
-type RegressTaskRequest struct {
-	Amount int `json:"amount"`
-}
-
 type CheckInRequest struct {
 	Mood string `json:"mood"`
+}
+
+type AddPenaltyRequest struct {
+	Amount   int    `json:"amount"`
+	Reason   string `json:"reason"`
+	Currency string `json:"currency"`
+	GoalID   string `json:"goal_id,omitempty"`
 }
 
 type MilestoneResponse struct {
@@ -80,23 +79,22 @@ type GoalProgressResponse struct {
 }
 
 type TaskResponse struct {
-	ID               string `json:"id"`
-	GoalID           string `json:"goal_id"`
-	Title            string `json:"title"`
-	MilestoneFromID  string `json:"milestone_from_id"`
-	MilestoneToID    string `json:"milestone_to_id"`
-	ContributionCoef int    `json:"contribution_coef"`
-	Difficulty       string `json:"difficulty"`
-	Status           string `json:"status"`
+	ID         string `json:"id"`
+	GoalID     string `json:"goal_id"`
+	Title      string `json:"title"`
+	GPPReward  int    `json:"gpp_reward"`
+	Difficulty string `json:"difficulty"`
+	Status     string `json:"status"`
 }
 
 type HabitResponse struct {
-	ID             string                    `json:"id"`
-	Title          string                    `json:"title"`
-	BaseXP         int                       `json:"base_xp"`
-	StreakTracking bool                      `json:"streak_tracking"`
-	Category       string                    `json:"category"`
-	Milestones     []StreakMilestoneResponse `json:"milestones"`
+	ID              string                    `json:"id"`
+	Title           string                    `json:"title"`
+	BaseXP          int                       `json:"base_xp"`
+	StreakTracking  bool                      `json:"streak_tracking"`
+	Category        string                    `json:"category"`
+	LastCompletedAt *string                   `json:"last_completed_at,omitempty"`
+	Milestones      []StreakMilestoneResponse `json:"milestones"`
 }
 
 type StreakMilestoneResponse struct {
@@ -161,4 +159,23 @@ type AnalyticsResponse struct {
 	HabitByCategory       []CategoryStatResponse `json:"habit_by_category"`
 	TaskXPLastWeek        int                    `json:"task_xp_last_week"`
 	RoutineStrategicRatio float64                `json:"routine_strategic_ratio"`
+}
+
+type TransactionResponse struct {
+	ID        string  `json:"id"`
+	Currency  string  `json:"currency"`
+	Amount    int     `json:"amount"`
+	Reason    string  `json:"reason"`
+	GoalID    *string `json:"goal_id,omitempty"`
+	GoalTitle string  `json:"goal_title,omitempty"`
+	CreatedAt string  `json:"created_at"`
+}
+
+type ActivityResponse struct {
+	ID            string         `json:"id"`
+	EventType     string         `json:"event_type"`
+	AggregateType string         `json:"aggregate_type"`
+	AggregateID   *string        `json:"aggregate_id,omitempty"`
+	Payload       map[string]any `json:"payload"`
+	OccurredAt    string         `json:"occurred_at"`
 }

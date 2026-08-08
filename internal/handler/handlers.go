@@ -49,11 +49,11 @@ func statusFor(err error) int {
 		errors.Is(err, service.ErrInactiveGoal):
 		return http.StatusBadRequest
 	case errors.Is(err, service.ErrTaskCompleted),
-		errors.Is(err, service.ErrUserExists):
+		errors.Is(err, service.ErrHabitDoneToday):
 		return http.StatusConflict
 	case errors.Is(err, service.ErrWrongOwner):
 		return http.StatusForbidden
-	case errors.Is(err, service.ErrInvalidCredentials):
+	case errors.Is(err, service.ErrAccountNotFound):
 		return http.StatusUnauthorized
 	default:
 		return http.StatusInternalServerError
@@ -65,32 +65,13 @@ type AuthHandler struct {
 	jwt *auth.JWTManager
 }
 
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var req dto.RegisterRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	user, err := h.svc.Register(r.Context(), req.Email, req.Password)
-	if err != nil {
-		writeError(w, statusFor(err), err.Error())
-		return
-	}
-	token, err := h.jwt.GenerateAccessToken(user.ID, "owner")
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "token generation failed")
-		return
-	}
-	writeJSON(w, http.StatusCreated, dto.AuthResponse{AccessToken: token})
-}
-
-func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) Session(w http.ResponseWriter, r *http.Request) {
 	var req dto.LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	user, err := h.svc.Login(r.Context(), req.Email, req.Password)
+	user, err := h.svc.Authenticate(r.Context(), req.Name)
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -101,6 +82,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, dto.AuthResponse{AccessToken: token})
+}
+
+func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {
+	user, err := h.svc.Me(r.Context(), middleware.GetUserID(r.Context()))
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, dto.MeResponse{Name: user.Name})
 }
 
 type GoalHandler struct {
@@ -173,6 +163,16 @@ func (h *GoalHandler) Review(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *GoalHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	goalID := chi.URLParam(r, "goalID")
+	if err := h.svc.DeleteGoal(r.Context(), userID, goalID); err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func goalToResponse(g *entity.Goal, milestones []entity.Milestone) dto.GoalResponse {
 	out := dto.GoalResponse{
 		ID: g.ID, Title: g.Title, TotalGPP: g.TotalGPP,
@@ -197,12 +197,35 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	task, err := h.svc.CreateTask(r.Context(), middleware.GetUserID(r.Context()),
-		req.GoalID, req.Title, req.MilestoneFromID, req.MilestoneToID, req.ContributionCoef, req.Difficulty)
+		req.GoalID, req.Title, req.GPPReward, req.Difficulty)
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
 	}
 	writeJSON(w, http.StatusCreated, taskResponse(task))
+}
+
+func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
+	tasks, err := h.svc.ListTasks(r.Context(), middleware.GetUserID(r.Context()))
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	out := make([]dto.TaskResponse, 0, len(tasks))
+	for i := range tasks {
+		out = append(out, taskResponse(&tasks[i]))
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	taskID := chi.URLParam(r, "taskID")
+	if err := h.svc.DeleteTask(r.Context(), userID, taskID); err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *TaskHandler) Complete(w http.ResponseWriter, r *http.Request) {
@@ -216,25 +239,10 @@ func (h *TaskHandler) Complete(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, completionResponse(res))
 }
 
-func (h *TaskHandler) Regress(w http.ResponseWriter, r *http.Request) {
-	var req dto.RegressTaskRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	err := h.svc.RegressTask(r.Context(), middleware.GetUserID(r.Context()), chi.URLParam(r, "taskID"), req.Amount)
-	if err != nil {
-		writeError(w, statusFor(err), err.Error())
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
 func taskResponse(t *entity.Task) dto.TaskResponse {
 	return dto.TaskResponse{
 		ID: t.ID, GoalID: t.GoalID, Title: t.Title,
-		MilestoneFromID: t.MilestoneFromID, MilestoneToID: t.MilestoneToID,
-		ContributionCoef: t.ContributionCoef, Difficulty: t.Difficulty, Status: string(t.Status),
+		GPPReward: t.GPPReward, Difficulty: t.Difficulty, Status: string(t.Status),
 	}
 }
 
@@ -294,10 +302,24 @@ func (h *HabitHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+func (h *HabitHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	habitID := chi.URLParam(r, "habitID")
+	if err := h.svc.DeleteHabit(r.Context(), userID, habitID); err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func habitResponse(h *entity.Habit) dto.HabitResponse {
 	out := dto.HabitResponse{
 		ID: h.ID, Title: h.Title, BaseXP: h.BaseXP,
 		StreakTracking: h.StreakTracking, Category: h.Category,
+	}
+	if h.LastCompletedAt != nil {
+		t := h.LastCompletedAt.Format("2006-01-02T15:04:05Z07:00")
+		out.LastCompletedAt = &t
 	}
 	for _, m := range h.StreakMilestones {
 		out.Milestones = append(out.Milestones, dto.StreakMilestoneResponse{
@@ -395,6 +417,56 @@ func (h *StatsHandler) CheckIn(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *StatsHandler) Penalty(w http.ResponseWriter, r *http.Request) {
+	var req dto.AddPenaltyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	err := h.svc.AddPenalty(r.Context(), middleware.GetUserID(r.Context()),
+		req.Amount, req.Reason, entity.Currency(req.Currency), req.GoalID)
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *StatsHandler) Activity(w http.ResponseWriter, r *http.Request) {
+	events, err := h.svc.RecentActivity(r.Context(), middleware.GetUserID(r.Context()), 50)
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	out := make([]dto.ActivityResponse, 0, len(events))
+	for _, e := range events {
+		out = append(out, dto.ActivityResponse{
+			ID: e.ID, EventType: string(e.EventType), AggregateType: e.AggregateType,
+			AggregateID: e.AggregateID, Payload: e.Payload,
+			OccurredAt: e.OccurredAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *StatsHandler) Transactions(w http.ResponseWriter, r *http.Request) {
+	txs, err := h.svc.ListTransactions(r.Context(), middleware.GetUserID(r.Context()), 100)
+	if err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	out := make([]dto.TransactionResponse, 0, len(txs))
+	for _, t := range txs {
+		res := dto.TransactionResponse{
+			ID: t.ID, Currency: string(t.Currency), Amount: t.Amount, Reason: t.Reason,
+			GoalID: t.GoalID, GoalTitle: t.GoalTitle,
+			CreatedAt: t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+		out = append(out, res)
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 func summaryResponse(s *service.DailySummary) dto.DailyStatsResponse {
 	return dto.DailyStatsResponse{
 		Day: s.Day, XPEarned: s.XPEarned, HabitXP: s.HabitXP, TaskXP: s.TaskXP,
@@ -405,6 +477,7 @@ func summaryResponse(s *service.DailySummary) dto.DailyStatsResponse {
 
 func weekResponse(w *service.WeekSummary) dto.WeekStatsResponse {
 	out := dto.WeekStatsResponse{
+		Days:    make([]dto.DailyStatsResponse, 0, len(w.Days)),
 		TotalXP: w.TotalXP, AvgDailyXP: w.AvgDailyXP, SuggestedWeeklyGoal: w.SuggestedWeeklyGoal,
 	}
 	for _, d := range w.Days {
@@ -417,6 +490,7 @@ func analyticsResponse(a *service.Analytics) dto.AnalyticsResponse {
 	out := dto.AnalyticsResponse{
 		Week: weekResponse(&a.Week), TaskXPLastWeek: a.TaskXPLastWeek,
 		RoutineStrategicRatio: a.RoutineStrategicRatio,
+		HabitByCategory:       make([]dto.CategoryStatResponse, 0, len(a.HabitByCategory)),
 	}
 	for _, c := range a.HabitByCategory {
 		out.HabitByCategory = append(out.HabitByCategory, dto.CategoryStatResponse{Category: c.Category, XP: c.XP})

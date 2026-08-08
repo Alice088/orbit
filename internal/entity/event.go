@@ -7,9 +7,13 @@ type EventType string
 const (
 	EventTaskCompleted       EventType = "task_completed"
 	EventTaskRegressed       EventType = "task_regressed"
+	EventTaskDeleted         EventType = "task_deleted"
+	EventManualPenalty       EventType = "manual_penalty"
 	EventHabitCompleted      EventType = "habit_completed"
+	EventHabitDeleted        EventType = "habit_deleted"
 	EventGoalCreated         EventType = "goal_created"
 	EventGoalReviewed        EventType = "goal_reviewed"
+	EventGoalDeleted         EventType = "goal_deleted"
 	EventManualCheckIn       EventType = "manual_checkin"
 	EventDailySettlement     EventType = "daily_settlement"
 	EventInactivityPenalty   EventType = "inactivity_penalty"
@@ -22,6 +26,7 @@ var ActivityEventTypes = []EventType{
 	EventGoalCreated,
 	EventGoalReviewed,
 	EventManualCheckIn,
+	EventManualPenalty,
 }
 
 type DomainEvent struct {

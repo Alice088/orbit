@@ -6,6 +6,7 @@ const (
 	ReasonMissedTwice = "habit_missed_twice"
 	ReasonInactivity  = "inactivity"
 	ReasonRegression  = "task_regression"
+	ReasonManual      = "manual_penalty"
 )
 
 type Penalty struct {

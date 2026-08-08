@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"orbit/internal/auth"
 	"orbit/internal/engine/economy"
 	"orbit/internal/engine/level"
 	"orbit/internal/engine/penalty"
@@ -12,6 +11,7 @@ import (
 	"orbit/internal/engine/streak"
 	"orbit/internal/entity"
 	"orbit/internal/repository"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,14 +19,14 @@ import (
 )
 
 var (
-	ErrValidation         = errors.New("validation failed")
-	ErrTaskCompleted      = errors.New("task already completed")
-	ErrMilestoneOrder     = errors.New("milestone_from must be below milestone_to")
-	ErrWrongOwner         = errors.New("resource belongs to another user")
-	ErrInactiveGoal       = errors.New("goal is not active")
-	ErrMissingMilestone   = errors.New("goal requires 0% and 100% milestones")
-	ErrUserExists         = errors.New("user already exists")
-	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrValidation       = errors.New("validation failed")
+	ErrTaskCompleted    = errors.New("task already completed")
+	ErrMilestoneOrder   = errors.New("milestone_from must be below milestone_to")
+	ErrWrongOwner       = errors.New("resource belongs to another user")
+	ErrInactiveGoal     = errors.New("goal is not active")
+	ErrMissingMilestone = errors.New("goal requires 0% and 100% milestones")
+	ErrAccountNotFound  = errors.New("аккаунт с таким именем не найден")
+	ErrHabitDoneToday   = errors.New("привычка уже выполнена сегодня")
 )
 
 type GameSettings struct {
@@ -103,6 +103,16 @@ type WeekSummary struct {
 type CategoryStat struct {
 	Category string
 	XP       int
+}
+
+type Transaction struct {
+	ID        string
+	Currency  entity.Currency
+	Amount    int
+	Reason    string
+	GoalID    *string
+	GoalTitle string
+	CreatedAt time.Time
 }
 
 type Analytics struct {
@@ -198,9 +208,12 @@ func validateMilestones(milestones []MilestoneInput, totalGPP int) error {
 	return nil
 }
 
-func (s *Service) CreateTask(ctx context.Context, userID string, goalID string, title string, milestoneFromID string, milestoneToID string, coef int, difficulty string) (*entity.Task, error) {
-	if coef < scoring.CoefMin || coef > scoring.CoefMax {
+func (s *Service) CreateTask(ctx context.Context, userID string, goalID string, title string, gppReward int, difficulty string) (*entity.Task, error) {
+	if gppReward < 1 || gppReward > 10000 {
 		return nil, ErrValidation
+	}
+	if difficulty != "easy" && difficulty != "normal" && difficulty != "hard" && difficulty != "epic" {
+		difficulty = "normal"
 	}
 	var task *entity.Task
 	err := s.withTx(ctx, func(tx pgx.Tx) error {
@@ -215,23 +228,9 @@ func (s *Service) CreateTask(ctx context.Context, userID string, goalID string, 
 		if goal.Status != entity.GoalStatusActive {
 			return ErrInactiveGoal
 		}
-		from, err := store.Goal.MilestoneByID(ctx, milestoneFromID)
-		if err != nil {
-			return err
-		}
-		to, err := store.Goal.MilestoneByID(ctx, milestoneToID)
-		if err != nil {
-			return err
-		}
-		if from.GoalID != goalID || to.GoalID != goalID {
-			return ErrWrongOwner
-		}
-		if from.Percent >= to.Percent {
-			return ErrMilestoneOrder
-		}
 		t := &entity.Task{
-			UserID: userID, GoalID: goalID, MilestoneFromID: milestoneFromID, MilestoneToID: milestoneToID,
-			Title: title, ContributionCoef: coef, Difficulty: difficulty, Status: entity.TaskStatusOpen,
+			UserID: userID, GoalID: goalID, Title: title,
+			GPPReward: gppReward, Difficulty: difficulty, Status: entity.TaskStatusOpen,
 		}
 		if err := store.Task.Create(ctx, t); err != nil {
 			return err
@@ -256,15 +255,18 @@ func (s *Service) CompleteTask(ctx context.Context, userID string, taskID string
 		if task.Status == entity.TaskStatusCompleted {
 			return ErrTaskCompleted
 		}
-		from, err := store.Goal.MilestoneByID(ctx, task.MilestoneFromID)
-		if err != nil {
-			return err
+		gpp := task.GPPReward
+		if gpp == 0 && task.MilestoneFromID != nil && task.MilestoneToID != nil {
+			from, err := store.Goal.MilestoneByID(ctx, *task.MilestoneFromID)
+			if err != nil {
+				return err
+			}
+			to, err := store.Goal.MilestoneByID(ctx, *task.MilestoneToID)
+			if err != nil {
+				return err
+			}
+			gpp = scoring.GPP(to.RewardPoints, from.RewardPoints, task.ContributionCoef)
 		}
-		to, err := store.Goal.MilestoneByID(ctx, task.MilestoneToID)
-		if err != nil {
-			return err
-		}
-		gpp := scoring.GPP(to.RewardPoints, from.RewardPoints, task.ContributionCoef)
 		xp := scoring.TaskXP(gpp, task.Difficulty)
 		ev := &entity.DomainEvent{
 			UserID: userID, EventType: entity.EventTaskCompleted,
@@ -303,38 +305,6 @@ func (s *Service) CompleteTask(ctx context.Context, userID string, taskID string
 		return nil
 	})
 	return result, err
-}
-
-func (s *Service) RegressTask(ctx context.Context, userID string, taskID string, amount int) error {
-	if amount <= 0 {
-		return ErrValidation
-	}
-	return s.withTx(ctx, func(tx pgx.Tx) error {
-		store := repository.NewStore(tx)
-		task, err := store.Task.GetByID(ctx, taskID)
-		if err != nil {
-			return err
-		}
-		if task.UserID != userID {
-			return ErrWrongOwner
-		}
-		ev := &entity.DomainEvent{
-			UserID: userID, EventType: entity.EventTaskRegressed,
-			AggregateType: "task", AggregateID: &task.ID,
-			Payload: map[string]any{"goal_id": task.GoalID, "amount": amount},
-		}
-		if err := store.Event.Insert(ctx, ev); err != nil {
-			return err
-		}
-		if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
-			UserID: userID, Currency: entity.CurrencyGPP, Amount: -amount,
-			Reason: penalty.ReasonRegression, GoalID: &task.GoalID, DomainEventID: &ev.ID,
-		}); err != nil {
-			return err
-		}
-		stats := &entity.DailyStats{UserID: userID, Day: s.today(), GPPEarned: -amount}
-		return store.Stats.UpsertDailyStats(ctx, stats)
-	})
 }
 
 func (s *Service) CreateHabit(ctx context.Context, userID string, title string, baseXP int, streakTracking bool, category string, milestones []StreakMilestoneInput) (*entity.Habit, error) {
@@ -383,6 +353,9 @@ func (s *Service) CompleteHabit(ctx context.Context, userID string, habitID stri
 		}
 		if habit.UserID != userID {
 			return ErrWrongOwner
+		}
+		if habit.LastCompletedAt != nil && s.dayOf(*habit.LastCompletedAt).Equal(s.today()) {
+			return ErrHabitDoneToday
 		}
 		state := streak.State{}
 		if habit.StreakTracking {
@@ -473,8 +446,8 @@ func (s *Service) CompleteHabit(ctx context.Context, userID string, habitID stri
 			if unlocked {
 				evA := &entity.DomainEvent{
 					UserID: userID, EventType: entity.EventAchievementUnlocked,
-					AggregateType: "achievement", AggregateID: &achievementCode,
-					Payload: map[string]any{"habit_id": habitID},
+					AggregateType: "achievement", AggregateID: &habitID,
+					Payload: map[string]any{"habit_id": habitID, "code": achievementCode},
 				}
 				if err := store.Event.Insert(ctx, evA); err != nil {
 					return err
@@ -485,7 +458,7 @@ func (s *Service) CompleteHabit(ctx context.Context, userID string, habitID stri
 			XP: baseAwarded + bonusAwarded, BonusXP: bonusAwarded,
 			StreakDays: state.CurrentDays, AchievementCode: achievementCode,
 		}
-		return nil
+		return store.Habit.SetLastCompleted(ctx, habitID, time.Now())
 	})
 	return result, err
 }
@@ -693,6 +666,198 @@ func (s *Service) GoalDetail(ctx context.Context, userID string, goalID string) 
 	return &GoalDetail{Goal: *goal, Milestones: milestones, EarnedGPP: earned}, nil
 }
 
+func (s *Service) ListTasks(ctx context.Context, userID string) ([]entity.Task, error) {
+	store := repository.NewStore(s.pool)
+	return store.Task.ListByUser(ctx, userID)
+}
+
+func (s *Service) RecentActivity(ctx context.Context, userID string, limit int) ([]entity.DomainEvent, error) {
+	store := repository.NewStore(s.pool)
+	return store.Event.ListRecent(ctx, userID, limit)
+}
+
+func (s *Service) ListTransactions(ctx context.Context, userID string, limit int) ([]Transaction, error) {
+	store := repository.NewStore(s.pool)
+	rows, err := store.Ledger.ListRecent(ctx, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Transaction, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, Transaction{
+			ID: r.ID, Currency: r.Currency, Amount: r.Amount, Reason: r.Reason,
+			GoalID: r.GoalID, GoalTitle: r.GoalTitle, CreatedAt: r.CreatedAt,
+		})
+	}
+	return out, nil
+}
+
+func (s *Service) AddPenalty(ctx context.Context, userID string, amount int, reason string, currency entity.Currency, goalID string) error {
+	if amount < 1 || amount > 10000 || strings.TrimSpace(reason) == "" {
+		return ErrValidation
+	}
+	if currency != entity.CurrencyXP && currency != entity.CurrencyGPP {
+		return ErrValidation
+	}
+	if currency == entity.CurrencyGPP && goalID == "" {
+		return ErrValidation
+	}
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		store := repository.NewStore(tx)
+		if currency == entity.CurrencyGPP {
+			goal, err := store.Goal.GetByID(ctx, goalID)
+			if err != nil {
+				return err
+			}
+			if goal.UserID != userID {
+				return ErrWrongOwner
+			}
+		}
+		ev := &entity.DomainEvent{
+			UserID: userID, EventType: entity.EventManualPenalty,
+			AggregateType: "user",
+			Payload: map[string]any{
+				"amount": amount, "reason": reason, "currency": string(currency),
+			},
+		}
+		if goalID != "" {
+			ev.AggregateType = "goal"
+			ev.AggregateID = &goalID
+			ev.Payload["goal_id"] = goalID
+		}
+		if err := store.Event.Insert(ctx, ev); err != nil {
+			return err
+		}
+		var goalIDPtr *string
+		if goalID != "" {
+			goalIDPtr = &goalID
+		}
+		if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
+			UserID: userID, Currency: currency, Amount: -amount,
+			Reason: penalty.ReasonManual, GoalID: goalIDPtr, DomainEventID: &ev.ID,
+		}); err != nil {
+			return err
+		}
+		stats := &entity.DailyStats{UserID: userID, Day: s.today()}
+		if currency == entity.CurrencyXP {
+			stats.PenaltyXP = -amount
+			stats.XPEarned = -amount
+		} else {
+			stats.GPPEarned = -amount
+		}
+		return store.Stats.UpsertDailyStats(ctx, stats)
+	})
+}
+
+func (s *Service) DeleteTask(ctx context.Context, userID string, taskID string) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		store := repository.NewStore(tx)
+		task, err := store.Task.GetByID(ctx, taskID)
+		if err != nil {
+			return err
+		}
+		if task.UserID != userID {
+			return ErrWrongOwner
+		}
+		if task.Status == entity.TaskStatusCompleted {
+			events, err := store.Event.ListByAggregate(ctx, userID, "task", taskID)
+			if err != nil {
+				return err
+			}
+			for _, ev := range events {
+				if ev.EventType != entity.EventTaskCompleted {
+					continue
+				}
+				txs, err := store.Ledger.ByEvent(ctx, ev.ID)
+				if err != nil {
+					return err
+				}
+				if len(txs) == 0 {
+					continue
+				}
+				reversal := &entity.DomainEvent{
+					UserID: userID, EventType: entity.EventTaskDeleted,
+					AggregateType: "task", AggregateID: &taskID,
+					Payload: map[string]any{"goal_id": task.GoalID, "reason": "task_deleted"},
+				}
+				if err := store.Event.Insert(ctx, reversal); err != nil {
+					return err
+				}
+				stats := &entity.DailyStats{UserID: userID, Day: s.dayOf(ev.OccurredAt), TasksCompleted: -1}
+				for _, t := range txs {
+					if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
+						UserID: userID, Currency: t.Currency, Amount: -t.Amount,
+						Reason: "task_deleted", GoalID: t.GoalID, DomainEventID: &reversal.ID,
+					}); err != nil {
+						return err
+					}
+					switch t.Currency {
+					case entity.CurrencyXP:
+						stats.XPEarned -= t.Amount
+						stats.TaskXP -= t.Amount
+					case entity.CurrencyGPP:
+						stats.GPPEarned -= t.Amount
+					}
+				}
+				if err := store.Stats.UpsertDailyStats(ctx, stats); err != nil {
+					return err
+				}
+			}
+		}
+		return store.Task.Delete(ctx, taskID)
+	})
+}
+
+func (s *Service) DeleteGoal(ctx context.Context, userID string, goalID string) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		store := repository.NewStore(tx)
+		goal, err := store.Goal.GetByID(ctx, goalID)
+		if err != nil {
+			return err
+		}
+		if goal.UserID != userID {
+			return ErrWrongOwner
+		}
+		if err := store.Task.DeleteByGoal(ctx, goalID); err != nil {
+			return err
+		}
+		if err := store.Ledger.DeleteGPPByGoal(ctx, userID, goalID); err != nil {
+			return err
+		}
+		ev := &entity.DomainEvent{
+			UserID: userID, EventType: entity.EventGoalDeleted,
+			AggregateType: "goal", AggregateID: &goalID,
+			Payload: map[string]any{"title": goal.Title},
+		}
+		if err := store.Event.Insert(ctx, ev); err != nil {
+			return err
+		}
+		return store.Goal.Delete(ctx, goalID)
+	})
+}
+
+func (s *Service) DeleteHabit(ctx context.Context, userID string, habitID string) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		store := repository.NewStore(tx)
+		habit, err := store.Habit.GetByID(ctx, habitID)
+		if err != nil {
+			return err
+		}
+		if habit.UserID != userID {
+			return ErrWrongOwner
+		}
+		ev := &entity.DomainEvent{
+			UserID: userID, EventType: entity.EventHabitDeleted,
+			AggregateType: "habit", AggregateID: &habitID,
+			Payload: map[string]any{"title": habit.Title},
+		}
+		if err := store.Event.Insert(ctx, ev); err != nil {
+			return err
+		}
+		return store.Habit.Delete(ctx, habitID)
+	})
+}
+
 func (s *Service) ListGoals(ctx context.Context, userID string) ([]entity.Goal, error) {
 	store := repository.NewStore(s.pool)
 	return store.Goal.ListByUser(ctx, userID)
@@ -799,32 +964,32 @@ func (s *Service) Analytics(ctx context.Context, userID string) (*Analytics, err
 	}, nil
 }
 
-func (s *Service) Register(ctx context.Context, email string, password string) (*entity.User, error) {
+func (s *Service) Authenticate(ctx context.Context, name string) (*entity.User, error) {
 	store := repository.NewStore(s.pool)
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, ErrValidation
+	}
+	u, err := store.User.GetByName(ctx, name)
+	if err == nil {
+		return u, nil
+	}
+	if !errors.Is(err, repository.ErrNotFound) {
+		return nil, err
+	}
 	count, err := store.User.Count(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if count > 0 {
-		return nil, ErrUserExists
+		return nil, ErrAccountNotFound
 	}
-	hash, err := auth.HashPassword(password)
-	if err != nil {
-		return nil, err
-	}
-	return store.User.Create(ctx, email, hash)
+	return store.User.Create(ctx, name)
 }
 
-func (s *Service) Login(ctx context.Context, email string, password string) (*entity.User, error) {
+func (s *Service) Me(ctx context.Context, userID string) (*entity.User, error) {
 	store := repository.NewStore(s.pool)
-	u, err := store.User.GetByEmail(ctx, email)
-	if err != nil {
-		return nil, ErrInvalidCredentials
-	}
-	if !auth.CheckPasswordHash(password, u.PasswordHash) {
-		return nil, ErrInvalidCredentials
-	}
-	return u, nil
+	return store.User.GetByID(ctx, userID)
 }
 
 func (s *Service) Location() *time.Location {

@@ -52,8 +52,8 @@ type LogConfig struct {
 type GameConfig struct {
 	Timezone             string `env:"TIMEZONE" envDefault:"UTC"`
 	DailyHabitCap        int    `env:"DAILY_HABIT_CAP" envDefault:"50"`
-	MissedTwicePenaltyXP int    `env:"MISSED_TWICE_PENALTY_XP" envDefault:"10"`
-	InactivityPenaltyXP  int    `env:"INACTIVITY_PENALTY_XP" envDefault:"10"`
+	MissedTwicePenaltyXP int    `env:"MISSED_TWICE_PENALTY_XP" envDefault:"3"`
+	InactivityPenaltyXP  int    `env:"INACTIVITY_PENALTY_XP" envDefault:"3"`
 }
 
 // DSN returns a PostgreSQL connection string.

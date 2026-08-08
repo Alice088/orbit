@@ -21,7 +21,6 @@ RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 
 COPY --from=builder /build/bin/api .
-COPY --from=builder /build/docs ./docs
 
 EXPOSE 8080
 

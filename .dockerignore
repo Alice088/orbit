@@ -1,0 +1,8 @@
+.git
+.gitignore
+.idea
+.env
+web/node_modules
+web/dist
+docs
+*.log

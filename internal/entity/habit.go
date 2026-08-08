@@ -10,6 +10,7 @@ type Habit struct {
 	StreakTracking   bool
 	Category         string
 	CreatedAt        time.Time
+	LastCompletedAt  *time.Time
 	StreakMilestones []StreakMilestone
 }
 

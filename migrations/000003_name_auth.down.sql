@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS users_name_unique;
+ALTER TABLE users DROP COLUMN IF EXISTS name;

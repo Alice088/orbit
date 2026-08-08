@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"orbit/internal/entity"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -34,10 +35,10 @@ func (r *HabitRepo) CreateMilestone(ctx context.Context, m *entity.StreakMilesto
 
 func (r *HabitRepo) GetByID(ctx context.Context, id string) (*entity.Habit, error) {
 	row := r.q.QueryRow(ctx,
-		`SELECT id, user_id, title, base_xp, streak_tracking, category, created_at
+		`SELECT id, user_id, title, base_xp, streak_tracking, category, created_at, last_completed_at
 		 FROM habits WHERE id = $1`, id)
 	var h entity.Habit
-	if err := row.Scan(&h.ID, &h.UserID, &h.Title, &h.BaseXP, &h.StreakTracking, &h.Category, &h.CreatedAt); err != nil {
+	if err := row.Scan(&h.ID, &h.UserID, &h.Title, &h.BaseXP, &h.StreakTracking, &h.Category, &h.CreatedAt, &h.LastCompletedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -76,7 +77,7 @@ func (r *HabitRepo) StreakMilestones(ctx context.Context, habitID string) ([]ent
 
 func (r *HabitRepo) ListByUser(ctx context.Context, userID string) ([]entity.Habit, error) {
 	rows, err := r.q.Query(ctx,
-		`SELECT id, user_id, title, base_xp, streak_tracking, category, created_at
+		`SELECT id, user_id, title, base_xp, streak_tracking, category, created_at, last_completed_at
 		 FROM habits WHERE user_id = $1 ORDER BY created_at`, userID)
 	if err != nil {
 		return nil, err
@@ -85,10 +86,25 @@ func (r *HabitRepo) ListByUser(ctx context.Context, userID string) ([]entity.Hab
 	var out []entity.Habit
 	for rows.Next() {
 		var h entity.Habit
-		if err := rows.Scan(&h.ID, &h.UserID, &h.Title, &h.BaseXP, &h.StreakTracking, &h.Category, &h.CreatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.UserID, &h.Title, &h.BaseXP, &h.StreakTracking, &h.Category, &h.CreatedAt, &h.LastCompletedAt); err != nil {
 			return nil, err
 		}
+		ms, err := r.StreakMilestones(ctx, h.ID)
+		if err != nil {
+			return nil, err
+		}
+		h.StreakMilestones = ms
 		out = append(out, h)
 	}
 	return out, rows.Err()
+}
+
+func (r *HabitRepo) SetLastCompleted(ctx context.Context, id string, t time.Time) error {
+	_, err := r.q.Exec(ctx, `UPDATE habits SET last_completed_at = $1 WHERE id = $2`, t, id)
+	return err
+}
+
+func (r *HabitRepo) Delete(ctx context.Context, id string) error {
+	_, err := r.q.Exec(ctx, `DELETE FROM habits WHERE id = $1`, id)
+	return err
 }

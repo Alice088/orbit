@@ -21,6 +21,11 @@ func (r *LedgerRepo) Insert(ctx context.Context, t *entity.PointTransaction) err
 	return row.Scan(&t.ID, &t.CreatedAt)
 }
 
+type TransactionRow struct {
+	entity.PointTransaction
+	GoalTitle string
+}
+
 func (r *LedgerRepo) SumGPPForGoal(ctx context.Context, userID string, goalID string) (int, error) {
 	var sum int
 	err := r.q.QueryRow(ctx,
@@ -35,4 +40,51 @@ func (r *LedgerRepo) SumXP(ctx context.Context, userID string) (int, error) {
 		`SELECT COALESCE(sum(amount), 0) FROM point_transactions
 		 WHERE user_id = $1 AND currency = 'xp'`, userID).Scan(&sum)
 	return sum, err
+}
+
+func (r *LedgerRepo) ListRecent(ctx context.Context, userID string, limit int) ([]TransactionRow, error) {
+	rows, err := r.q.Query(ctx,
+		`SELECT pt.id, pt.currency, pt.amount, pt.reason, pt.goal_id, pt.domain_event_id, pt.created_at, COALESCE(g.title, '')
+		 FROM point_transactions pt
+		 LEFT JOIN goals g ON pt.goal_id = g.id
+		 WHERE pt.user_id = $1
+		 ORDER BY pt.created_at DESC LIMIT $2`, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []TransactionRow
+	for rows.Next() {
+		var t TransactionRow
+		if err := rows.Scan(&t.ID, &t.Currency, &t.Amount, &t.Reason, &t.GoalID, &t.DomainEventID, &t.CreatedAt, &t.GoalTitle); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (r *LedgerRepo) ByEvent(ctx context.Context, eventID string) ([]entity.PointTransaction, error) {
+	rows, err := r.q.Query(ctx,
+		`SELECT id, user_id, currency, amount, reason, goal_id, domain_event_id, created_at
+		 FROM point_transactions WHERE domain_event_id = $1 ORDER BY created_at`, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []entity.PointTransaction
+	for rows.Next() {
+		var t entity.PointTransaction
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Currency, &t.Amount, &t.Reason, &t.GoalID, &t.DomainEventID, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (r *LedgerRepo) DeleteGPPByGoal(ctx context.Context, userID string, goalID string) error {
+	_, err := r.q.Exec(ctx,
+		`DELETE FROM point_transactions WHERE user_id = $1 AND goal_id = $2 AND currency = 'gpp'`, userID, goalID)
+	return err
 }

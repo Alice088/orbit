@@ -18,11 +18,11 @@ func NewUserRepo(q Querier) *UserRepo {
 
 var ErrNotFound = errors.New("not found")
 
-func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*entity.User, error) {
+func (r *UserRepo) GetByName(ctx context.Context, name string) (*entity.User, error) {
 	row := r.q.QueryRow(ctx,
-		`SELECT id, email, password_hash, created_at FROM users WHERE email = $1`, email)
+		`SELECT id, email, password_hash, name, created_at FROM users WHERE lower(name) = lower($1)`, name)
 	var u entity.User
-	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.CreatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -33,9 +33,9 @@ func (r *UserRepo) GetByEmail(ctx context.Context, email string) (*entity.User, 
 
 func (r *UserRepo) GetByID(ctx context.Context, id string) (*entity.User, error) {
 	row := r.q.QueryRow(ctx,
-		`SELECT id, email, password_hash, created_at FROM users WHERE id = $1`, id)
+		`SELECT id, email, password_hash, name, created_at FROM users WHERE id = $1`, id)
 	var u entity.User
-	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt); err != nil {
+	if err := row.Scan(&u.ID, &u.Email, &u.PasswordHash, &u.Name, &u.CreatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -67,12 +67,12 @@ func (r *UserRepo) ListIDs(ctx context.Context) ([]string, error) {
 	return out, rows.Err()
 }
 
-func (r *UserRepo) Create(ctx context.Context, email string, passwordHash string) (*entity.User, error) {
+func (r *UserRepo) Create(ctx context.Context, name string) (*entity.User, error) {
 	row := r.q.QueryRow(ctx,
-		`INSERT INTO users (email, password_hash) VALUES ($1, $2) RETURNING id, created_at`, email, passwordHash)
+		`INSERT INTO users (email, password_hash, name) VALUES ($1, '', $2) RETURNING id, created_at`, name, name)
 	var u entity.User
-	u.Email = email
-	u.PasswordHash = passwordHash
+	u.Email = name
+	u.Name = name
 	if err := row.Scan(&u.ID, &u.CreatedAt); err != nil {
 		return nil, err
 	}

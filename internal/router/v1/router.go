@@ -25,11 +25,12 @@ func NewRouter(healthHandler *handler.HealthHandler, handlers *handler.Handlers,
 	r.Get("/health", healthHandler.Health)
 
 	r.Route("/v1", func(r chi.Router) {
-		r.Post("/auth/register", handlers.Auth.Register)
-		r.Post("/auth/login", handlers.Auth.Login)
+		r.Post("/auth/session", handlers.Auth.Session)
 
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.JWTAuth(jwtManager))
+
+			r.Get("/me", handlers.Auth.Me)
 
 			r.Route("/goals", func(r chi.Router) {
 				r.Post("/", handlers.Goals.Create)
@@ -37,21 +38,27 @@ func NewRouter(healthHandler *handler.HealthHandler, handlers *handler.Handlers,
 				r.Get("/{goalID}", handlers.Goals.Detail)
 				r.Get("/{goalID}/progress", handlers.Goals.Progress)
 				r.Post("/{goalID}/review", handlers.Goals.Review)
+				r.Delete("/{goalID}", handlers.Goals.Delete)
 			})
 
 			r.Route("/tasks", func(r chi.Router) {
 				r.Post("/", handlers.Tasks.Create)
+				r.Get("/", handlers.Tasks.List)
 				r.Post("/{taskID}/complete", handlers.Tasks.Complete)
-				r.Post("/{taskID}/regress", handlers.Tasks.Regress)
+				r.Delete("/{taskID}", handlers.Tasks.Delete)
 			})
 
 			r.Route("/habits", func(r chi.Router) {
 				r.Post("/", handlers.Habits.Create)
 				r.Post("/{habitID}/complete", handlers.Habits.Complete)
 				r.Get("/", handlers.Habits.List)
+				r.Delete("/{habitID}", handlers.Habits.Delete)
 			})
 
 			r.Post("/checkin", handlers.Stats.CheckIn)
+			r.Post("/penalties", handlers.Stats.Penalty)
+			r.Get("/activity", handlers.Stats.Activity)
+			r.Get("/transactions", handlers.Stats.Transactions)
 			r.Get("/streaks", handlers.Stats.Streaks)
 			r.Get("/achievements", handlers.Stats.Achievements)
 			r.Get("/stats/today", handlers.Stats.Today)
