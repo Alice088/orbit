@@ -5,11 +5,10 @@ import { Link } from "react-router-dom"
 import { api } from "@/lib/api"
 import { formatNumber, formatShortDate, greeting, weekRangeLabel } from "@/lib/format"
 import { MetricCard } from "@/components/shared/metric-card"
-import { ProgressBar } from "@/components/shared/progress-bar"
 import { ActivityItem } from "@/components/shared/activity-item"
 import { WeekNav } from "@/components/shared/week-nav"
 import { EmptyState } from "@/components/shared/page-header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -18,9 +17,9 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
+  type ChartConfig,
 } from "@/components/ui/chart"
-import { Area, AreaChart, XAxis, YAxis } from "recharts"
-import { goalStatusLabel } from "@/lib/labels"
+import { Area, AreaChart, LabelList, RadialBar, RadialBarChart, XAxis, YAxis } from "recharts"
 
 export default function DashboardPage() {
   const [weeksBack, setWeeksBack] = useState(0)
@@ -54,6 +53,26 @@ export default function DashboardPage() {
 
   const doneToday =
     (today.data?.tasks_completed ?? 0) + (today.data?.habits_completed ?? 0)
+
+  const visibleGoals = (goals.data ?? []).slice(0, 4)
+  const goalChartData = visibleGoals.map((g, i) => {
+    const prog = goalsWithProgress.data?.find((p) => p.goal_id === g.id)
+    return {
+      goal: g.title,
+      percent: prog?.percent ?? 0,
+      fill: `hsl(var(--chart-${i + 1}))`,
+    }
+  })
+  const goalChartConfig = Object.fromEntries(
+    goalChartData.map((d) => [d.goal, { label: d.goal }])
+  ) satisfies ChartConfig
+  const totalEarned = visibleGoals.reduce((s, g) => {
+    const p = goalsWithProgress.data?.find((x) => x.goal_id === g.id)
+    return s + (p?.earned_gpp ?? 0)
+  }, 0)
+  const totalGPP = visibleGoals.reduce((s, g) => s + g.total_gpp, 0)
+  const avgPercent =
+    totalGPP > 0 ? Math.round((totalEarned / totalGPP) * 100) : 0
 
   return (
     <div className="flex flex-col gap-6">
@@ -176,9 +195,9 @@ export default function DashboardPage() {
               </Link>
             </Button>
           </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+          <CardContent className="flex-1 pb-0">
             {goals.isLoading ? (
-              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-56 w-full" />
             ) : !goals.data || goals.data.length === 0 ? (
               <EmptyState
                 icon={Target}
@@ -191,30 +210,46 @@ export default function DashboardPage() {
                 }
               />
             ) : (
-              (goals.data ?? []).slice(0, 4).map((g) => {
-                const prog = goalsWithProgress.data?.find((p) => p.goal_id === g.id)
-                return (
-                  <Link key={g.id} to={`/goals/${g.id}`} className="group block">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-medium group-hover:underline">
-                        {g.title}
-                      </p>
-                      <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {prog ? `${prog.percent}%` : "0%"}
-                      </span>
-                    </div>
-                    <ProgressBar value={prog?.percent ?? 0} className="mt-2" />
-                    <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{goalStatusLabel[g.status] ?? g.status}</span>
-                      <span className="tabular-nums">
-                        {formatNumber(prog?.earned_gpp ?? 0)} / {formatNumber(g.total_gpp)} GPP
-                      </span>
-                    </div>
-                  </Link>
-                )
-              })
+              <ChartContainer
+                config={goalChartConfig}
+                className="mx-auto aspect-square max-h-[250px]"
+              >
+                <RadialBarChart
+                  data={goalChartData}
+                  startAngle={-90}
+                  endAngle={380}
+                  innerRadius={30}
+                  outerRadius={110}
+                >
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent hideLabel nameKey="goal" />}
+                  />
+                  <RadialBar dataKey="percent" background>
+                    <LabelList
+                      position="insideStart"
+                      dataKey="goal"
+                      className="fill-white mix-blend-luminosity"
+                      fontSize={11}
+                    />
+                  </RadialBar>
+                </RadialBarChart>
+              </ChartContainer>
             )}
           </CardContent>
+          {visibleGoals.length > 0 && (
+            <CardFooter className="flex-col items-start gap-1 pt-4 text-sm">
+              <div className="flex items-center gap-2 leading-none font-medium">
+                <Target className="size-3.5" />
+                Средний прогресс: {avgPercent}%
+              </div>
+              <div className="leading-none text-muted-foreground">
+                {formatNumber(totalEarned)} / {formatNumber(totalGPP)} GPP по{" "}
+                {visibleGoals.length}{" "}
+                {visibleGoals.length === 1 ? "цели" : "целям"}
+              </div>
+            </CardFooter>
+          )}
         </Card>
 
         <Card className="shadow-none">
