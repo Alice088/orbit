@@ -14,6 +14,7 @@ type Config struct {
 	Database DatabaseConfig `envPrefix:"DB_"`
 	JWT      JWTConfig      `envPrefix:"JWT_"`
 	Log      LogConfig      `envPrefix:"LOG_"`
+	Game     GameConfig     `envPrefix:"GAME_"`
 }
 
 // ServerConfig contains HTTP server settings.
@@ -45,6 +46,14 @@ type JWTConfig struct {
 type LogConfig struct {
 	Level  string `env:"LEVEL" envDefault:"info"`
 	Format string `env:"FORMAT" envDefault:"json"`
+}
+
+// GameConfig contains game economy and settlement settings.
+type GameConfig struct {
+	Timezone             string `env:"TIMEZONE" envDefault:"UTC"`
+	DailyHabitCap        int    `env:"DAILY_HABIT_CAP" envDefault:"50"`
+	MissedTwicePenaltyXP int    `env:"MISSED_TWICE_PENALTY_XP" envDefault:"10"`
+	InactivityPenaltyXP  int    `env:"INACTIVITY_PENALTY_XP" envDefault:"10"`
 }
 
 // DSN returns a PostgreSQL connection string.

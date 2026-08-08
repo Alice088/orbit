@@ -1,0 +1,12 @@
+DROP TABLE IF EXISTS achievements;
+DROP TABLE IF EXISTS daily_stats;
+DROP TABLE IF EXISTS day_settlements;
+DROP TABLE IF EXISTS point_transactions;
+DROP TABLE IF EXISTS domain_events;
+DROP TABLE IF EXISTS streaks;
+DROP TABLE IF EXISTS habit_streak_milestones;
+DROP TABLE IF EXISTS habits;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS milestones;
+DROP TABLE IF EXISTS goals;
+DROP TABLE IF EXISTS users;

@@ -2,8 +2,8 @@ package middleware
 
 import (
 	"context"
-	"go-template/internal/auth"
 	"net/http"
+	"orbit/internal/auth"
 	"strings"
 )
 
@@ -46,11 +46,11 @@ func JWTAuth(jwtManager *auth.JWTManager) func(http.Handler) http.Handler {
 }
 
 // GetUserID extracts the authenticated user ID from context.
-func GetUserID(ctx context.Context) int64 {
-	if id, ok := ctx.Value(UserIDKey).(int64); ok {
+func GetUserID(ctx context.Context) string {
+	if id, ok := ctx.Value(UserIDKey).(string); ok {
 		return id
 	}
-	return 0
+	return ""
 }
 
 // GetRole extracts the authenticated user role from context.

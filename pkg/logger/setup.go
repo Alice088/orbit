@@ -2,7 +2,7 @@
 package logger
 
 import (
-	"go-template/internal/config"
+	"orbit/internal/config"
 	"os"
 
 	"github.com/rs/zerolog"

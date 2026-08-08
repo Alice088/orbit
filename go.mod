@@ -1,4 +1,4 @@
-module go-template
+module orbit
 
 go 1.26.3
 

@@ -23,11 +23,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"go-template/internal/config"
-	"go-template/internal/database"
-	"go-template/internal/handler"
-	"go-template/pkg/logger"
 	"net/http"
+	"orbit/internal/auth"
+	"orbit/internal/config"
+	"orbit/internal/database"
+	"orbit/internal/handler"
+	"orbit/internal/scheduler"
+	"orbit/internal/service"
+	"orbit/pkg/logger"
 	"os"
 	"os/signal"
 	"syscall"
@@ -36,7 +39,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
 
-	v1 "go-template/internal/router/v1"
+	v1 "orbit/internal/router/v1"
 )
 
 const version = "0.1.0"
@@ -59,11 +62,27 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to database")
 	}
-	defer db.Close()
 
 	healthHandler := handler.NewHealthHandler(version)
 
-	router := v1.NewRouter(healthHandler)
+	svc, err := service.NewService(db.Pool, service.GameSettings{
+		Timezone:             cfg.Game.Timezone,
+		DailyHabitCap:        cfg.Game.DailyHabitCap,
+		MissedTwicePenaltyXP: cfg.Game.MissedTwicePenaltyXP,
+		InactivityPenaltyXP:  cfg.Game.InactivityPenaltyXP,
+	})
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to init service")
+	}
+	defer db.Close()
+
+	jwtManager := auth.NewJWTManager(cfg.JWT.SecretKey, cfg.JWT.AccessExpiry, cfg.JWT.RefreshExpiry)
+	handlers := handler.NewHandlers(svc, jwtManager)
+
+	router := v1.NewRouter(healthHandler, handlers, jwtManager)
+
+	sched := scheduler.New(svc)
+	go sched.Run(context.Background())
 
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{

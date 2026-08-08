@@ -15,7 +15,7 @@ var (
 
 // Claims represents the JWT claims payload.
 type Claims struct {
-	UserID int64  `json:"user_id"`
+	UserID string `json:"user_id"`
 	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
@@ -37,7 +37,7 @@ func NewJWTManager(secretKey string, accessExpiry, refreshExpiry time.Duration) 
 }
 
 // GenerateAccessToken creates a signed access token for the given user.
-func (m *JWTManager) GenerateAccessToken(userID int64, role string) (string, error) {
+func (m *JWTManager) GenerateAccessToken(userID string, role string) (string, error) {
 	claims := &Claims{
 		UserID: userID,
 		Role:   role,
@@ -51,7 +51,7 @@ func (m *JWTManager) GenerateAccessToken(userID int64, role string) (string, err
 }
 
 // GenerateRefreshToken creates a signed refresh token for the given user.
-func (m *JWTManager) GenerateRefreshToken(userID int64) (string, error) {
+func (m *JWTManager) GenerateRefreshToken(userID string) (string, error) {
 	claims := &Claims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
