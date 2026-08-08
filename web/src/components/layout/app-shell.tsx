@@ -1,8 +1,11 @@
 import { useState } from "react"
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import {
   Activity,
+  ArrowLeft,
   BarChart3,
+  BookOpen,
   Coins,
   LayoutDashboard,
   ListChecks,
@@ -10,7 +13,6 @@ import {
   Menu,
   Moon,
   Repeat,
-  Search,
   Settings,
   Sun,
   Target,
@@ -29,51 +31,60 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Input } from "@/components/ui/input"
 import { api, setToken } from "@/lib/api"
+import { implGroups, theoryToc } from "@/lib/docs-data"
+import { isEn } from "@/lib/i18n"
+import { useSearchParams } from "react-router-dom"
+import { isEn, setLanguage } from "@/lib/i18n"
+import { useEffect } from "react"
 
 const navGroups = [
   {
-    label: "Обзор",
+    label: "nav.overview",
     items: [
-      { to: "/", label: "Дашборд", icon: LayoutDashboard },
-      { to: "/goals", label: "Цели", icon: Target },
-      { to: "/tasks", label: "Задачи", icon: ListChecks },
-      { to: "/habits", label: "Привычки", icon: Repeat },
+      { to: "/", label: "nav.dashboard", icon: LayoutDashboard },
+      { to: "/goals", label: "nav.goals", icon: Target },
+      { to: "/tasks", label: "nav.tasks", icon: ListChecks },
+      { to: "/habits", label: "nav.habits", icon: Repeat },
     ],
   },
   {
-    label: "Анализ",
+    label: "nav.analysis",
     items: [
-      { to: "/activity", label: "Активность", icon: Activity },
-      { to: "/points", label: "Баллы", icon: Coins },
-      { to: "/analytics", label: "Аналитика", icon: BarChart3 },
+      { to: "/activity", label: "nav.activity", icon: Activity },
+      { to: "/points", label: "nav.points", icon: Coins },
+      { to: "/analytics", label: "nav.analytics", icon: BarChart3 },
     ],
   },
   {
-    label: "Система",
-    items: [{ to: "/settings", label: "Настройки", icon: Settings }],
+    label: "nav.system",
+    items: [
+      { to: "/settings", label: "nav.settings", icon: Settings },
+      { to: "/docs", label: "nav.docs", icon: BookOpen },
+    ],
   },
 ]
 
-const pageTitles: Record<string, string> = {
-  "/": "Дашборд",
-  "/goals": "Цели",
-  "/tasks": "Задачи",
-  "/habits": "Привычки",
-  "/activity": "Активность",
-  "/points": "Баллы",
-  "/analytics": "Аналитика",
-  "/settings": "Настройки",
+const pageTitleKeys: Record<string, string> = {
+  "/": "nav.dashboard",
+  "/goals": "nav.goals",
+  "/tasks": "nav.tasks",
+  "/habits": "nav.habits",
+  "/activity": "nav.activity",
+  "/points": "nav.points",
+  "/analytics": "nav.analytics",
+  "/settings": "nav.settings",
+  "/docs": "nav.docs",
 }
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+  const { t } = useTranslation()
   return (
     <nav className="flex flex-col gap-6 px-3 py-4">
       {navGroups.map((group) => (
         <div key={group.label} className="flex flex-col gap-1">
           <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
-            {group.label}
+            {t(group.label)}
           </p>
           {group.items.map((item) => (
             <NavLink
@@ -91,7 +102,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               }
             >
               <item.icon className="size-4" />
-              {item.label}
+              {t(item.label)}
             </NavLink>
           ))}
         </div>
@@ -100,25 +111,185 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-function Logo() {
+function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { t } = useTranslation()
+  const tab: "theory" | "impl" = searchParams.get("t") === "impl" ? "impl" : "theory"
+  const hash = decodeURIComponent(location.hash.slice(1))
+
+  const goSection = (id: string) => {
+    onNavigate?.()
+    navigate(`/docs?t=${tab}#${id}`, { replace: true })
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }
+
+  const switchTab = (t: "theory" | "impl") => {
+    onNavigate?.()
+    navigate(t === "impl" ? "/docs?t=impl" : "/docs", { replace: false })
+    window.scrollTo({ top: 0 })
+  }
+
+  const goBack = () => {
+    onNavigate?.()
+    navigate("/")
+  }
+
+  const toc = theoryToc[isEn() ? "en" : "ru"]
   return (
-    <div className="flex items-center gap-2 px-5 py-4">
+    <nav className="flex flex-col gap-6 px-3 py-4">
+      <button
+        type="button"
+        onClick={goBack}
+        className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+      >
+        <ArrowLeft className="size-4" />
+        {t("docs.back")}
+      </button>
+      <div className="flex flex-col gap-1">
+        <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+          {t("docs.documentation")}
+        </p>
+        <div className="mt-1 flex gap-1 px-1">
+          <button
+            type="button"
+            onClick={() => switchTab("theory")}
+            className={cn(
+              "flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
+              tab === "theory"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+            )}
+          >
+            {t("docs.theory")}
+          </button>
+          <button
+            type="button"
+            onClick={() => switchTab("impl")}
+            className={cn(
+              "flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
+              tab === "impl"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+            )}
+          >
+            {t("docs.implementation")}
+          </button>
+        </div>
+      </div>
+
+      {tab === "theory" ? (
+        <div className="flex flex-col gap-1">
+          <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            {t("docs.sections")}
+          </p>
+          {toc.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => goSection(item.id)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors",
+                hash === item.id
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+              )}
+            >
+              {item.title}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {implGroups.map((group) => (
+            <div key={group.id} className="flex flex-col gap-1">
+              <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+                {t(`docs.groups.${group.id}`)}
+              </p>
+              {group.blockIds.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => goSection(id)}
+                  className={cn(
+                    "rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors",
+                    hash === id
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+                  )}
+                >
+                  {t(`docs.blocks.${id}.title`)}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </nav>
+  )
+}
+
+function SidebarPanels({ onNavigate }: { onNavigate?: () => void }) {
+  const location = useLocation()
+  const isDocs = location.pathname.startsWith("/docs")
+  return (
+    <div className="relative flex-1 overflow-hidden">
+      <div
+        className={cn(
+          "absolute inset-0 overflow-y-auto transition-all duration-300 motion-reduce:transition-none",
+          isDocs ? "-translate-x-4 opacity-0" : "translate-x-0 opacity-100",
+        )}
+      >
+        <SidebarNav onNavigate={onNavigate} />
+      </div>
+      <div
+        className={cn(
+          "absolute inset-0 overflow-y-auto transition-all duration-300 motion-reduce:transition-none",
+          isDocs ? "translate-x-0 opacity-100" : "translate-x-4 opacity-0 pointer-events-none",
+        )}
+      >
+        <DocsNav onNavigate={onNavigate} />
+      </div>
+    </div>
+  )
+}
+
+function Logo({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Link to="/" onClick={onNavigate} className="flex items-center gap-2 px-5 py-4">
       <div className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
         <Target className="size-4" />
       </div>
       <span className="text-[15px] font-semibold tracking-tight">Orbit</span>
-    </div>
+    </Link>
+  )
+}
+
+function LanguageToggle() {
+  const { t } = useTranslation()
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="text-xs font-semibold"
+      aria-label={t("langToggle." + (isEn() ? "toRu" : "toEn"))}
+      onClick={() => setLanguage(isEn() ? "ru" : "en")}
+    >
+      {isEn() ? "RU" : "EN"}
+    </Button>
   )
 }
 
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme()
+  const { t } = useTranslation()
   const dark = resolvedTheme === "dark"
   return (
     <Button
       variant="ghost"
       size="icon"
-      aria-label={dark ? "Включить светлую тему" : "Включить тёмную тему"}
+      aria-label={dark ? t("settings.lightTheme") : t("settings.darkTheme")}
       onClick={() => setTheme(dark ? "light" : "dark")}
     >
       {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
@@ -128,13 +299,14 @@ function ThemeToggle() {
 
 function UserMenu() {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const me = useQuery({ queryKey: ["me"], queryFn: api.me })
   const name = me.data?.name ?? ""
   const initial = name ? name[0].toUpperCase() : "O"
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full" aria-label="Профиль">
+        <Button variant="ghost" size="icon" className="rounded-full" aria-label={t("common.profile")}>
           <Avatar className="size-8">
             <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
               {initial}
@@ -143,7 +315,7 @@ function UserMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel className="font-medium">{name || "Профиль"}</DropdownMenuLabel>
+        <DropdownMenuLabel className="font-medium">{name || t("common.profile")}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => {
@@ -153,7 +325,7 @@ function UserMenu() {
           }}
         >
           <LogOut className="size-4" />
-          Выйти
+          {t("common.signOut")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -162,17 +334,26 @@ function UserMenu() {
 
 export function AppShell() {
   const location = useLocation()
+  const { t, i18n: i18next } = useTranslation()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const title = pageTitles[location.pathname] ?? "Orbit"
+  const [langTick, setLangTick] = useState(0)
+
+  useEffect(() => {
+    const handler = () => setLangTick((n) => n + 1)
+    i18next.on("languageChanged", handler)
+    return () => i18next.off("languageChanged", handler)
+  }, [i18next])
+  void langTick
+
+  const titleKey = pageTitleKeys[location.pathname] ?? ""
+  const title = titleKey ? t(titleKey) : "Orbit"
 
   return (
     <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
       <div className="flex min-h-screen bg-background">
         <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col border-r border-sidebar-border bg-sidebar md:flex">
           <Logo />
-          <div className="flex-1 overflow-y-auto">
-            <SidebarNav />
-          </div>
+          <SidebarPanels />
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col md:pl-60">
@@ -184,14 +365,7 @@ export function AppShell() {
             </SheetTrigger>
             <h1 className="text-[15px] font-semibold tracking-tight">{title}</h1>
             <div className="ml-auto flex items-center gap-1.5">
-              <div className="relative hidden items-center sm:flex">
-                <Search className="absolute left-2.5 size-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Поиск…"
-                  className="h-8 w-44 rounded-md border bg-muted/50 pl-8 pr-8 text-sm"
-                />
-                <kbd className="absolute right-2 text-[10px] text-muted-foreground">⌘K</kbd>
-              </div>
+              <LanguageToggle />
               <ThemeToggle />
               <UserMenu />
             </div>
@@ -202,8 +376,8 @@ export function AppShell() {
         </div>
 
         <SheetContent side="left" className="w-64 p-0">
-          <Logo />
-          <SidebarNav onNavigate={() => setMobileOpen(false)} />
+          <Logo onNavigate={() => setMobileOpen(false)} />
+          <SidebarPanels onNavigate={() => setMobileOpen(false)} />
         </SheetContent>
       </div>
     </Sheet>

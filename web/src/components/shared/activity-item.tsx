@@ -53,7 +53,7 @@ export function ActivityItem({
         {!last && <div className="mt-1 w-px flex-1 bg-border" />}
       </div>
       <div className="min-w-0 pt-0.5">
-        <p className="text-sm font-medium">{eventLabel[event.event_type] ?? event.event_type}</p>
+        <p className="text-sm font-medium">{eventLabel(event.event_type)}</p>
         {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
         <p className={cn("mt-0.5 text-xs text-muted-foreground/70")}>{timeAgo(event.occurred_at)}</p>
       </div>

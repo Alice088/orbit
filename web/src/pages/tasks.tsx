@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { CheckCircle2, ListChecks, Trash2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { api } from "@/lib/api"
 import { difficultyLabel } from "@/lib/labels"
 import { formatNumber } from "@/lib/format"
@@ -18,6 +19,7 @@ import { toast } from "sonner"
 type Filter = "all" | "open" | "completed"
 
 export default function TasksPage() {
+  const { t } = useTranslation()
   const [filter, setFilter] = useState<Filter>("all")
   const [page, setPage] = useState(1)
   const queryClient = useQueryClient()
@@ -37,7 +39,7 @@ export default function TasksPage() {
       queryClient.invalidateQueries({ queryKey: ["stats"] })
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
       queryClient.invalidateQueries({ queryKey: ["activity"] })
-      toast.success("Задача выполнена")
+      toast.success(t("tasks.completedToast"))
     },
     onError: (err) => toast.error(err.message),
   })
@@ -50,7 +52,7 @@ export default function TasksPage() {
       queryClient.invalidateQueries({ queryKey: ["stats"] })
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
       queryClient.invalidateQueries({ queryKey: ["activity"] })
-      toast.success("Задача удалена")
+      toast.success(t("tasks.deleted"))
     },
     onError: (err) => toast.error(err.message),
   })
@@ -64,8 +66,8 @@ export default function TasksPage() {
   return (
     <div>
       <PageHeader
-        title="Задачи"
-        description="Стратегические шаги внутри целей. Выполнение даёт GPP и XP."
+        title={t("tasks.title")}
+        description={t("tasks.subtitle")}
         actions={<TaskCreateDialog />}
       />
       <Tabs
@@ -77,9 +79,9 @@ export default function TasksPage() {
         className="mb-4"
       >
         <TabsList>
-          <TabsTrigger value="all">Все</TabsTrigger>
-          <TabsTrigger value="open">Открытые</TabsTrigger>
-          <TabsTrigger value="completed">Выполненные</TabsTrigger>
+          <TabsTrigger value="all">{t("tasks.all")}</TabsTrigger>
+          <TabsTrigger value="open">{t("tasks.open")}</TabsTrigger>
+          <TabsTrigger value="completed">{t("tasks.completed")}</TabsTrigger>
         </TabsList>
       </Tabs>
       {tasks.isLoading ? (
@@ -90,61 +92,61 @@ export default function TasksPage() {
       ) : shown.length === 0 ? (
         <EmptyState
           icon={ListChecks}
-          title="Задач нет"
+          title={t("tasks.emptyTitle")}
           description={
             tasks.data && tasks.data.total === 0
-              ? "Создай задачу внутри цели — она переведёт цель к следующей вехе."
-              : "В этом разделе пока пусто."
+              ? t("tasks.emptyFirst")
+              : t("tasks.emptyFilter")
           }
           action={<TaskCreateDialog />}
         />
       ) : (
         <div className="flex flex-col gap-2">
-          {shown.map((t) => (
-            <Card key={t.id} className="shadow-none">
+          {shown.map((task) => (
+            <Card key={task.id} className="shadow-none">
               <CardContent className="flex items-center justify-between gap-3 px-4 py-3">
                 <div className="min-w-0">
                   <p
                     className={
-                      t.status === "completed"
+                      task.status === "completed"
                         ? "truncate text-sm font-medium text-muted-foreground line-through"
                         : "truncate text-sm font-medium"
                     }
                   >
-                    {t.title}
+                    {task.title}
                   </p>
                   <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {goalTitle.get(t.goal_id) ?? "—"} · {difficultyLabel[t.difficulty] ?? t.difficulty}
+                    {goalTitle.get(task.goal_id) ?? "—"} · {difficultyLabel(task.difficulty)}
                   </p>
-                  {t.gpp_reward > 0 && (
+                  {task.gpp_reward > 0 && (
                     <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-                      +{formatNumber(t.gpp_reward)} GPP
+                      +{formatNumber(task.gpp_reward)} GPP
                     </p>
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <StatusBadge
-                    label={t.status === "completed" ? "Выполнена" : "Открыта"}
-                    variant={t.status === "completed" ? "completed" : "active"}
+                    label={task.status === "completed" ? t("tasks.statusCompleted") : t("tasks.statusOpen")}
+                    variant={task.status === "completed" ? "completed" : "active"}
                   />
-                  {t.status === "open" && (
+                  {task.status === "open" && (
                     <>
-                      <Button size="sm" onClick={() => complete.mutate(t.id)}>
+                      <Button size="sm" onClick={() => complete.mutate(task.id)}>
                         <CheckCircle2 className="size-4" />
-                        Выполнить
+                        {t("tasks.complete")}
                       </Button>
                     </>
                   )}
                   <ConfirmDialog
-                    title="Удалить задачу?"
+                    title={t("tasks.deleteTitle")}
                     description={
-                      t.status === "completed"
-                        ? `Задача «${t.title}» будет удалена, её XP и GPP вернутся (пересчёт).`
-                        : `Задача «${t.title}» будет удалена.`
+                      task.status === "completed"
+                        ? t("tasks.deleteDescCompleted", { title: task.title })
+                        : t("tasks.deleteDesc", { title: task.title })
                     }
-                    onConfirm={() => remove.mutate(t.id)}
+                    onConfirm={() => remove.mutate(task.id)}
                     trigger={
-                      <Button variant="ghost" size="icon" aria-label="Удалить задачу">
+                      <Button variant="ghost" size="icon" aria-label={t("goalDetail.deleteTaskAria")}>
                         <Trash2 className="size-4" />
                       </Button>
                     }

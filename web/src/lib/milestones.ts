@@ -1,3 +1,4 @@
+import i18n from "@/lib/i18n"
 import { achievementTitle } from "@/lib/labels"
 
 export function scaledThreshold(base: number, level: number): number {
@@ -22,7 +23,7 @@ export function nextMilestoneInfo(
       level: next,
       days: scaledThreshold(m.days, next),
       bonus_xp: scaledThreshold(m.bonus_xp, next),
-      title: next === 1 ? achievementTitle(m.achievement_code ?? "") : `${habit.title} урв.${next}`,
+      title: next === 1 ? achievementTitle(m.achievement_code ?? "") : i18n.t("milestones.levelTitle", { title: habit.title, level: next }),
     })
   }
   candidates.sort((a, b) => a.days - b.days)

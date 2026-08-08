@@ -2,17 +2,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Award, LogOut, Moon, Sun } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useTheme } from "next-themes"
+import { useTranslation } from "react-i18next"
 import { api, setToken } from "@/lib/api"
 import { formatDate } from "@/lib/format"
 import { achievementTitle } from "@/lib/labels"
+import { setLanguage } from "@/lib/i18n"
 import { PageHeader } from "@/components/shared/page-header"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { cn } from "@/lib/utils"
 
 export default function SettingsPage() {
   const navigate = useNavigate()
   const { resolvedTheme, setTheme } = useTheme()
+  const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
   const achievements = useQuery({
     queryKey: ["achievements"],
@@ -30,16 +34,16 @@ export default function SettingsPage() {
 
   return (
     <div className="flex max-w-2xl flex-col gap-6">
-      <PageHeader title="Настройки" description="Оформление и аккаунт." />
+      <PageHeader title={t("settings.title")} description={t("settings.subtitle")} />
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Оформление</CardTitle>
-          <CardDescription>Тёмная тема использует светлый текст на тёмном фоне.</CardDescription>
+          <CardTitle className="text-sm font-semibold">{t("settings.appearance")}</CardTitle>
+          <CardDescription>{t("settings.appearanceDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-between rounded-md border px-4 py-3">
           <div className="flex items-center gap-2.5">
             {dark ? <Moon className="size-4 text-muted-foreground" /> : <Sun className="size-4 text-muted-foreground" />}
-            <span className="text-sm font-medium">{dark ? "Тёмная тема" : "Светлая тема"}</span>
+            <span className="text-sm font-medium">{dark ? t("settings.darkTheme") : t("settings.lightTheme")}</span>
           </div>
           <Switch checked={dark} onCheckedChange={(v) => setTheme(v ? "dark" : "light")} />
         </CardContent>
@@ -47,17 +51,51 @@ export default function SettingsPage() {
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Аккаунт</CardTitle>
-          <CardDescription>Личная система одного пользователя.</CardDescription>
+          <CardTitle className="text-sm font-semibold">{t("settings.language")}</CardTitle>
+          <CardDescription>{t("settings.languageDesc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between rounded-md border px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{i18n.language === "ru" ? "Русский" : "English"}</span>
+          </div>
+          <div className="flex gap-1 rounded-lg bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setLanguage("ru")}
+              className={cn(
+                "rounded-md px-3 py-1 text-sm font-medium transition-colors",
+                i18n.language === "ru" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              RU
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage("en")}
+              className={cn(
+                "rounded-md px-3 py-1 text-sm font-medium transition-colors",
+                i18n.language === "en" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground",
+              )}
+            >
+              EN
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-none">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">{t("settings.account")}</CardTitle>
+          <CardDescription>{t("settings.accountDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="flex items-center justify-between rounded-md border px-4 py-3">
             <div>
-              <p className="text-sm font-medium">Ежедневный чекин</p>
-              <p className="text-xs text-muted-foreground">Фиксирует активность, чтобы не сработал штраф за простой</p>
+              <p className="text-sm font-medium">{t("settings.checkin")}</p>
+              <p className="text-xs text-muted-foreground">{t("settings.checkinDesc")}</p>
             </div>
             <Button variant="outline" size="sm" onClick={() => checkin.mutate()}>
-              Отметить
+              {t("settings.checkinBtn")}
             </Button>
           </div>
           <Button variant="outline" onClick={() => {
@@ -66,20 +104,20 @@ export default function SettingsPage() {
             navigate("/login", { replace: true })
           }}>
             <LogOut className="size-4" />
-            Выйти
+            {t("common.signOut")}
           </Button>
         </CardContent>
       </Card>
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Достижения</CardTitle>
-          <CardDescription>Открываются за серии привычек.</CardDescription>
+          <CardTitle className="text-sm font-semibold">{t("settings.achievements")}</CardTitle>
+          <CardDescription>{t("settings.achievementsDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {achievements.isLoading ? null : !achievements.data || achievements.data.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              Пока нет — держи серию привычки до вехи
+              {t("settings.noAchievements")}
             </p>
           ) : (
             achievements.data.map((a) => (

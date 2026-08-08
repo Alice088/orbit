@@ -1,8 +1,9 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Flame, Plus, Repeat, Trash2, CheckCircle2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { api, ApiError } from "@/lib/api"
-import { plural } from "@/lib/format"
+import { pluralDays } from "@/lib/format"
 import { achievementTitle } from "@/lib/labels"
 import { nextMilestoneInfo } from "@/lib/milestones"
 import { PageHeader, EmptyState } from "@/components/shared/page-header"
@@ -67,6 +68,7 @@ interface MilestoneRow {
 
 function HabitCreateDialog() {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [baseXP, setBaseXP] = useState("5")
@@ -94,10 +96,10 @@ function HabitCreateDialog() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["habits"] })
       setOpen(false)
-      toast.success("Привычка создана")
+      toast.success(t("habits.created"))
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : "Не удалось создать привычку")
+      setError(err instanceof ApiError ? err.message : t("habits.errCreate"))
     },
   })
 
@@ -109,21 +111,21 @@ function HabitCreateDialog() {
       .filter((r) => r.days !== "" || r.bonus !== "")
       .map((r) => ({ days: Number(r.days), bonus: Number(r.bonus) }))
     if (!title.trim() || base <= 0) {
-      setError("Заполни название и базовый XP")
+      setError(t("habits.errFill"))
       return
     }
     if (rows.filter((r) => r.days !== "" || r.bonus !== "").some((r) => !r.title.trim())) {
-      setError("У каждой вехи укажи название достижения")
+      setError(t("habits.errAchievementTitle"))
       return
     }
     if (parsed.some((r) => !Number.isFinite(r.days) || !Number.isFinite(r.bonus) || r.days <= 0 || r.bonus <= 0)) {
-      setError("Вехи серии: дни и бонус должны быть положительными числами")
+      setError(t("habits.errPositive"))
       return
     }
     const sorted = [...parsed].sort((a, b) => a.days - b.days)
     for (let i = 1; i < sorted.length; i++) {
       if (sorted[i].days <= sorted[i - 1].days) {
-        setError("Дни вех должны идти по возрастанию")
+        setError(t("habits.errDaysAscending"))
         return
       }
     }
@@ -139,29 +141,29 @@ function HabitCreateDialog() {
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="size-4" />
-          Новая привычка
+          {t("habits.create")}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Новая привычка</DialogTitle>
+          <DialogTitle>{t("habits.create")}</DialogTitle>
           <DialogDescription>
-            Привычка — регулярное действие. Каждое выполнение даёт базовый XP, серия — бонусы.
+            {t("habits.dialogDesc")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="habit-title">Название</Label>
+            <Label htmlFor="habit-title">{t("common.title")}</Label>
             <Input
               id="habit-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Тренировка"
+              placeholder={t("habits.titlePlaceholder")}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="habit-xp">Базовый XP</Label>
+              <Label htmlFor="habit-xp">{t("habits.baseXp")}</Label>
               <Input
                 id="habit-xp"
                 type="number"
@@ -171,20 +173,20 @@ function HabitCreateDialog() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="habit-category">Категория</Label>
+              <Label htmlFor="habit-category">{t("habits.category")}</Label>
               <Input
                 id="habit-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                placeholder="здоровье, учёба…"
+                placeholder={t("habits.categoryPlaceholder")}
               />
             </div>
           </div>
           <div className="flex flex-col gap-2">
-            <Label>Вехи серии</Label>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Веха сработает один раз, когда серия достигнет N дней подряд: начислится бонус к XP и откроется достижение с названием, которое ты укажешь. После прохождения вех порог и награда каждой умножаются на 1.5 (с округлением вверх), а достижения идут по уровням: «Название урв.2», «урв.3» и так далее.
-              </p>
+            <Label>{t("habits.milestones")}</Label>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t("habits.milestoneHint")}
+            </p>
               <div className="flex flex-col gap-2">
                 {rows.map((row, i) => (
                   <div key={i} className="flex flex-col gap-2 rounded-md border px-2 py-2">
@@ -196,9 +198,9 @@ function HabitCreateDialog() {
                         onChange={(e) => setRow(i, "days", e.target.value)}
                         className="w-16"
                         placeholder="7"
-                        aria-label="Дней в серии"
+                        aria-label={t("habits.daysAria")}
                       />
-                      <span className="whitespace-nowrap text-sm text-muted-foreground">дней подряд →</span>
+                      <span className="whitespace-nowrap text-sm text-muted-foreground">{t("habits.daysRow")}</span>
                       <span className="text-sm text-muted-foreground">+</span>
                       <Input
                         type="number"
@@ -207,7 +209,7 @@ function HabitCreateDialog() {
                         onChange={(e) => setRow(i, "bonus", e.target.value)}
                         className="w-16"
                         placeholder="5"
-                        aria-label="Бонус XP"
+                        aria-label={t("habits.bonusAria")}
                       />
                       <span className="whitespace-nowrap text-sm text-muted-foreground">XP</span>
                       <Button
@@ -216,7 +218,7 @@ function HabitCreateDialog() {
                         size="icon"
                         className="ml-auto"
                         onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
-                        aria-label="Удалить веху"
+                        aria-label={t("habits.removeMilestoneAria")}
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -224,8 +226,8 @@ function HabitCreateDialog() {
                     <Input
                       value={row.title}
                       onChange={(e) => setRow(i, "title", e.target.value)}
-                      placeholder="название достижения"
-                      aria-label="Название достижения"
+                      placeholder={t("habits.achievementPlaceholder")}
+                      aria-label={t("habits.achievementAria")}
                     />
                   </div>
                 ))}
@@ -237,13 +239,13 @@ function HabitCreateDialog() {
                 onClick={() => setRows((prev) => [...prev, { days: "", bonus: "", title: "" }])}
               >
                 <Plus className="size-4" />
-                Добавить веху
+                {t("habits.addMilestone")}
               </Button>
             </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Создание…" : "Создать"}
+              {mutation.isPending ? t("common.creating") : t("common.create")}
             </Button>
           </DialogFooter>
         </form>
@@ -254,6 +256,7 @@ function HabitCreateDialog() {
 
 export default function HabitsPage() {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const habits = useQuery({ queryKey: ["habits"], queryFn: api.habits.list })
   const streaks = useQuery({ queryKey: ["streaks"], queryFn: api.stats.streaks })
   const streakByHabit = new Map((streaks.data ?? []).map((s) => [s.habit_id, s]))
@@ -278,8 +281,8 @@ export default function HabitsPage() {
       queryClient.invalidateQueries({ queryKey: ["activity"] })
       queryClient.invalidateQueries({ queryKey: ["achievements"] })
       const parts = [`+${res.xp} XP`]
-      if (res.bonus_xp) parts.push(`бонус +${res.bonus_xp}`)
-      if (res.streak_days) parts.push(`серия ${res.streak_days} дн`)
+      if (res.bonus_xp) parts.push(t("habits.bonusToast", { n: res.bonus_xp }))
+      if (res.streak_days) parts.push(t("habits.streakToast", { count: res.streak_days }))
       if (res.achievement_code)
         parts.push(`${achievementTitle(res.achievement_code)}`)
       toast.success(
@@ -301,7 +304,7 @@ export default function HabitsPage() {
       queryClient.invalidateQueries({ queryKey: ["habits"] })
       queryClient.invalidateQueries({ queryKey: ["streaks"] })
       queryClient.invalidateQueries({ queryKey: ["activity"] })
-      toast.success("Привычка удалена")
+      toast.success(t("habits.deleted"))
     },
     onError: (err) => toast.error(err.message),
   })
@@ -309,8 +312,8 @@ export default function HabitsPage() {
   return (
     <div>
       <PageHeader
-        title="Привычки"
-        description="Регулярные действия. Выполнение каждый день укрепляет серию."
+        title={t("habits.title")}
+        description={t("habits.subtitle")}
         actions={<HabitCreateDialog />}
       />
       {habits.isLoading ? (
@@ -321,8 +324,8 @@ export default function HabitsPage() {
       ) : !habits.data || habits.data.length === 0 ? (
         <EmptyState
           icon={Repeat}
-          title="Привычек нет"
-          description="Создай привычку, чтобы превратить регулярные действия в систему."
+          title={t("habits.emptyTitle")}
+          description={t("habits.emptyDesc")}
           action={<HabitCreateDialog />}
         />
       ) : (
@@ -345,7 +348,7 @@ export default function HabitsPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium">{h.title}</p>
-                        <p className="text-xs text-muted-foreground">+{h.base_xp} XP за выполнение</p>
+                        <p className="text-xs text-muted-foreground">{t("habits.perCompletion", { xp: h.base_xp })}</p>
                       </div>
                     </div>
                     {h.category && <StatusBadge label={h.category} />}
@@ -356,19 +359,19 @@ export default function HabitsPage() {
                         <Flame className="size-4 text-muted-foreground" />
                         <span className="font-medium">{s?.current_days ?? 0}</span>
                         <span className="text-xs text-muted-foreground">
-                          {plural(s?.current_days ?? 0, ["день", "дня", "дней"])}
+                          {pluralDays(s?.current_days ?? 0)}
                         </span>
                       </div>
                       {next ? (
                         <span className="text-xs text-muted-foreground">
-                          до вехи {next.days} дн: +{next.bonus_xp} XP · {next.title}
+                          {t("habits.toMilestone", { days: next.days, bonus: next.bonus_xp, title: next.title })}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">без вех</span>
+                        <span className="text-xs text-muted-foreground">{t("habits.noMilestones")}</span>
                       )}
                     </div>
                   ) : (
-                    <p className="text-xs text-muted-foreground">Без отслеживания серии</p>
+                    <p className="text-xs text-muted-foreground">{t("habits.noStreak")}</p>
                   )}
                   <div className="flex items-center gap-1.5">
                     <Button
@@ -384,18 +387,18 @@ export default function HabitsPage() {
                       {done ? (
                         <>
                           <CheckCircle2 className="size-4" />
-                          <span className="tabular-nums">Выполнено · {formatRemaining(untilMidnight(now))}</span>
+                          <span className="tabular-nums">{t("habits.done", { time: formatRemaining(untilMidnight(now)) })}</span>
                         </>
                       ) : (
-                        "Выполнить"
+                        t("habits.complete")
                       )}
                     </Button>
                     <ConfirmDialog
-                      title="Удалить привычку?"
-                      description={`Привычка «${h.title}» и её серия будут удалены. Заработанный XP останется.`}
+                      title={t("habits.deleteTitle")}
+                      description={t("habits.deleteDesc", { title: h.title })}
                       onConfirm={() => remove.mutate(h.id)}
                       trigger={
-                        <Button variant="ghost" size="icon" aria-label="Удалить привычку">
+                        <Button variant="ghost" size="icon" aria-label={t("habits.deleteTitle")}>
                           <Trash2 className="size-4" />
                         </Button>
                       }

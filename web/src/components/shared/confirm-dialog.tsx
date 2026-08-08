@@ -9,11 +9,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import { useTranslation } from "react-i18next"
 
 export function ConfirmDialog({
   title,
   description,
-  confirmLabel = "Удалить",
+  confirmLabel,
   onConfirm,
   trigger,
 }: {
@@ -23,6 +24,7 @@ export function ConfirmDialog({
   onConfirm: () => void
   trigger: React.ReactNode
 }) {
+  const { t } = useTranslation()
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
@@ -32,12 +34,12 @@ export function ConfirmDialog({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Отмена</AlertDialogCancel>
+          <AlertDialogCancel>{t("confirm.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             className="bg-destructive text-white hover:bg-destructive/90"
           >
-            {confirmLabel}
+            {confirmLabel ?? t("confirm.delete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

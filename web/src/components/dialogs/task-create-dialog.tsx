@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { api, ApiError } from "@/lib/api"
-import { difficultyLabel, difficultyMultiplierLabel } from "@/lib/labels"
+import { difficultyOptions } from "@/lib/labels"
 import { taskXp } from "@/lib/format"
 import { Button } from "@/components/ui/button"
 import {
@@ -33,6 +34,7 @@ export function TaskCreateDialog({
   onCreated?: () => void
 }) {
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [goalId, setGoalId] = useState(presetGoalId ?? "")
   const [title, setTitle] = useState("")
@@ -71,11 +73,11 @@ export function TaskCreateDialog({
       setOpen(false)
       setTitle("")
       setGpp("")
-      toast.success("Задача создана")
+      toast.success(t("taskCreate.created"))
       onCreated?.()
     },
     onError: (err) => {
-      setError(err instanceof ApiError ? err.message : "Не удалось создать задачу")
+      setError(err instanceof ApiError ? err.message : t("taskCreate.errCreate"))
     },
   })
 
@@ -83,7 +85,7 @@ export function TaskCreateDialog({
     e.preventDefault()
     setError("")
     if (!title.trim() || !goalId || !Number.isFinite(gppNum) || gppNum < 1 || gppNum > 5) {
-      setError("Укажи название, цель и цену задачи (1–5 GPP)")
+      setError(t("taskCreate.errFields"))
       return
     }
     mutation.mutate()
@@ -94,32 +96,32 @@ export function TaskCreateDialog({
       <DialogTrigger asChild>
         <Button size="sm">
           <Plus className="size-4" />
-          Новая задача
+          {t("taskCreate.create")}
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Новая задача</DialogTitle>
+          <DialogTitle>{t("taskCreate.create")}</DialogTitle>
           <DialogDescription>
-            Укажи цену задачи в GPP — прогресс цели посчитается сам.
+            {t("taskCreate.desc")}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="task-title">Название</Label>
+            <Label htmlFor="task-title">{t("common.title")}</Label>
             <Input
               id="task-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Например: Прочитать главу учебника"
+              placeholder={t("taskCreate.titlePlaceholder")}
               autoFocus
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label>Цель</Label>
+            <Label>{t("taskCreate.goal")}</Label>
             <Select value={goalId || undefined} onValueChange={setGoalId}>
               <SelectTrigger>
-                <SelectValue placeholder="Выбери цель" />
+                <SelectValue placeholder={t("taskCreate.chooseGoal")} />
               </SelectTrigger>
               <SelectContent>
                 {(goals.data ?? []).map((g) => (
@@ -132,7 +134,7 @@ export function TaskCreateDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="task-gpp">Цена, GPP</Label>
+              <Label htmlFor="task-gpp">{t("taskCreate.price")}</Label>
               <Input
                 id="task-gpp"
                 type="number"
@@ -140,20 +142,20 @@ export function TaskCreateDialog({
                 max={5}
                 value={gpp}
                 onChange={(e) => setGpp(e.target.value)}
-                placeholder="например 2"
+                placeholder={t("taskCreate.pricePlaceholder")}
               />
-              <p className="text-xs text-muted-foreground">от 1 до 5</p>
+              <p className="text-xs text-muted-foreground">{t("taskCreate.fromTo")}</p>
             </div>
             <div className="flex flex-col gap-2">
-              <Label>Сложность</Label>
+              <Label>{t("taskCreate.difficulty")}</Label>
               <Select value={difficulty} onValueChange={setDifficulty}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(difficultyLabel).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                      {label} {difficultyMultiplierLabel[key]}
+                  {difficultyOptions().map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label} {opt.multiplier}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -162,23 +164,22 @@ export function TaskCreateDialog({
           </div>
           {preview && (
             <div className="rounded-md bg-muted px-3 py-2 text-sm tabular-nums">
-              Награда: <span className="font-medium">+{preview.gpp} GPP</span> ·{" "}
-              <span className="font-medium">+{preview.xp} XP</span>
+              {t("taskCreate.reward", { gpp: preview.gpp, xp: preview.xp })}
             </div>
           )}
           <div className="rounded-md bg-muted/60 px-3 py-2.5 text-xs text-muted-foreground">
-            <p className="mb-1 font-medium text-muted-foreground">Как оценить цену:</p>
+            <p className="mb-1 font-medium text-muted-foreground">{t("taskCreate.pricing")}</p>
             <ul className="flex flex-col gap-0.5">
-              <li>1 GPP — мелочь (пара минут)</li>
-              <li>2–3 GPP — обычная задача (час-два)</li>
-              <li>4–5 GPP — крупная (полдня и больше)</li>
-              <li>XP = цена × сложность (×0.5–×2), минимум 1</li>
+              <li>{t("taskCreate.pricing1")}</li>
+              <li>{t("taskCreate.pricing2")}</li>
+              <li>{t("taskCreate.pricing3")}</li>
+              <li>{t("taskCreate.pricing4")}</li>
             </ul>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? "Создание…" : "Создать"}
+              {mutation.isPending ? t("common.creating") : t("common.create")}
             </Button>
           </DialogFooter>
         </form>

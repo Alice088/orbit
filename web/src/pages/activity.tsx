@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Activity as ActivityIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { api } from "@/lib/api"
 import { formatDate } from "@/lib/format"
 import { PageHeader, EmptyState } from "@/components/shared/page-header"
@@ -9,6 +10,7 @@ import { Pagination } from "@/components/shared/pagination"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export default function ActivityPage() {
+  const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const limit = 20
   const activity = useQuery({
@@ -27,16 +29,16 @@ export default function ActivityPage() {
   return (
     <div>
       <PageHeader
-        title="Активность"
-        description="Журнал всех событий: задачи, привычки, ревью и расчёты."
+        title={t("activity.title")}
+        description={t("activity.subtitle")}
       />
       {activity.isLoading ? (
         <Skeleton className="h-64 w-full" />
       ) : !activity.data || activity.data.items.length === 0 ? (
         <EmptyState
           icon={ActivityIcon}
-          title="Пока тихо"
-          description="Здесь появится журнал действий, когда ты выполнишь первую задачу или привычку."
+          title={t("activity.emptyTitle")}
+          description={t("activity.emptyDesc")}
         />
       ) : (
         <div className="flex flex-col gap-6">

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { BarChart3, Flame, Scale, Target } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { api } from "@/lib/api"
 import { formatNumber, formatShortDate, weekRangeLabel } from "@/lib/format"
 import { PageHeader } from "@/components/shared/page-header"
@@ -16,6 +17,7 @@ import {
 import { Bar, BarChart, LabelList, XAxis } from "recharts"
 
 export default function AnalyticsPage() {
+  const { t } = useTranslation()
   const [weeksBack, setWeeksBack] = useState(0)
   const analytics = useQuery({
     queryKey: ["analytics", weeksBack],
@@ -52,8 +54,8 @@ export default function AnalyticsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Аналитика"
-        description="Недельные показатели: сколько XP ты наработал и на что они ушли."
+        title={t("analytics.title")}
+        description={t("analytics.subtitle")}
         actions={
           <WeekNav
             weeksBack={weeksBack}
@@ -65,33 +67,33 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={BarChart3}
-          label="XP за неделю"
+          label={t("analytics.weekXp")}
           value={formatNumber(a.week.total_xp)}
-          hint={`среднее: ${formatNumber(a.week.avg_daily_xp)} XP/день`}
+          hint={t("analytics.avgHint", { n: formatNumber(a.week.avg_daily_xp) })}
         />
         <MetricCard
           icon={Target}
-          label="Предложение на неделю"
+          label={t("analytics.suggestion")}
           value={formatNumber(a.week.suggested_weekly_goal)}
-          hint="цель ×1.1 от среднего, не применяется автоматически"
+          hint={t("analytics.suggestionHint")}
         />
         <MetricCard
           icon={Scale}
-          label="Рутина / стратегия"
+          label={t("analytics.routine")}
           value={`${routinePct}%`}
-          hint={`привычки: ${formatNumber(habitXPWeek)} XP · задачи: ${formatNumber(taskXPWeek)} XP`}
+          hint={t("analytics.routineHint", { habits: formatNumber(habitXPWeek), tasks: formatNumber(taskXPWeek) })}
         />
         <MetricCard
           icon={Flame}
-          label="XP из задач за неделю"
+          label={t("analytics.taskXp")}
           value={formatNumber(a.task_xp_last_week)}
-          hint="стратегический вклад"
+          hint={t("analytics.taskXpHint")}
         />
       </div>
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">XP по дням недели</CardTitle>
+          <CardTitle className="text-sm font-semibold">{t("analytics.weekChart")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ChartContainer
@@ -123,18 +125,18 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card className="shadow-none">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold">XP привычек по категориям</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t("analytics.categoryChart")}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {a.habit_by_category == null || a.habit_by_category.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                Пока нет данных за неделю
+                {t("analytics.noData")}
               </p>
             ) : (
               a.habit_by_category.map((c) => (
-                <div key={c.category || "без категории"}>
+                <div key={c.category || "uncategorized"}>
                   <div className="mb-1.5 flex items-center justify-between text-sm">
-                    <span className="font-medium">{c.category || "без категории"}</span>
+                    <span className="font-medium">{c.category || t("analytics.noCategory")}</span>
                     <span className="tabular-nums text-muted-foreground">{formatNumber(c.xp)} XP</span>
                   </div>
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -151,32 +153,32 @@ export default function AnalyticsPage() {
 
         <Card className="shadow-none">
           <CardHeader>
-            <CardTitle className="text-sm font-semibold">Баланс недели</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t("analytics.balance")}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {weekData.every((d) => d.xp === 0) ? (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                Неделя ещё не началась — выполни первое действие
+                {t("analytics.weekNotStarted")}
               </p>
             ) : (
               <div className="flex flex-col gap-3">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Привычки (рутина)</span>
+                  <span className="text-muted-foreground">{t("analytics.habitsRoutine")}</span>
                   <span className="tabular-nums font-medium">{formatNumber(habitXPWeek)} XP</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Задачи (стратегия)</span>
+                  <span className="text-muted-foreground">{t("analytics.tasksStrategy")}</span>
                   <span className="tabular-nums font-medium">{formatNumber(taskXPWeek)} XP</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Штрафы</span>
+                  <span className="text-muted-foreground">{t("analytics.penalties")}</span>
                   <span className="tabular-nums font-medium text-red-700 dark:text-red-400">
                     {formatNumber(penaltyXPWeek)} XP
                   </span>
                 </div>
                 <div className="h-px bg-border" />
                 <div className="flex items-center justify-between text-sm font-semibold">
-                  <span>Итого</span>
+                  <span>{t("analytics.total")}</span>
                   <span className="tabular-nums">{formatNumber(a.week.total_xp)} XP</span>
                 </div>
               </div>

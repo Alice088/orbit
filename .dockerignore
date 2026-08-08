@@ -4,5 +4,4 @@
 .env
 web/node_modules
 web/dist
-docs
 *.log

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Coins, Sparkles, Target, TrendingUp } from "lucide-react"
+import { useTranslation } from "react-i18next"
 import { api, type Transaction } from "@/lib/api"
 import { formatNumber, formatDateTime } from "@/lib/format"
 import { reasonLabel, currencyLabel } from "@/lib/labels"
@@ -45,6 +46,7 @@ function CurrencyPill({ currency }: { currency: string }) {
 }
 
 export default function PointsPage() {
+  const { t } = useTranslation()
   const [page, setPage] = useState(1)
   const limit = 20
   const level = useQuery({ queryKey: ["level"], queryFn: api.stats.level })
@@ -58,46 +60,46 @@ export default function PointsPage() {
   const lastWeekXP = week.data?.total_xp ?? 0
   const trend =
     lastWeekXP > 0
-      ? { up: true, text: `+${formatNumber(lastWeekXP)} XP за неделю` }
+      ? { up: true, text: t("points.weekEarned", { n: formatNumber(lastWeekXP) }) }
       : lastWeekXP < 0
-        ? { up: false, text: `${formatNumber(lastWeekXP)} XP за неделю` }
+        ? { up: false, text: t("points.weekLost", { n: formatNumber(lastWeekXP) }) }
         : null
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Баллы"
-        description="XP — глобальный уровень, GPP — прогресс целей. Это бухгалтерия, а не игра."
+        title={t("points.title")}
+        description={t("points.subtitle")}
         actions={<PenaltyDialog />}
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={Sparkles}
-          label="Всего XP"
+          label={t("points.totalXp")}
           value={level.isLoading ? "—" : formatNumber(level.data?.xp ?? 0)}
-          hint={level.data ? `уровень: ${level.data.level_name}` : undefined}
+          hint={level.data ? t("points.levelHint", { name: level.data.level_name }) : undefined}
         />
         <MetricCard
           icon={TrendingUp}
-          label="XP за неделю"
+          label={t("points.weekXp")}
           value={week.isLoading ? "—" : formatNumber(lastWeekXP)}
-          hint={trend ? trend.text : "нет данных"}
+          hint={trend ? trend.text : t("points.noData")}
         />
         <MetricCard
           icon={Coins}
-          label="GPP за сегодня"
+          label={t("points.gppToday")}
           value={today.isLoading ? "—" : formatNumber(today.data?.gpp_earned ?? 0)}
-          hint="прогресс целей"
+          hint={t("points.goalProgress")}
         />
         <MetricCard
           icon={Target}
-          label="До следующего уровня"
+          label={t("points.toNextLevel")}
           value={
             level.isLoading || !level.data?.next_xp
               ? "—"
               : formatNumber(Math.max(0, level.data.next_xp - level.data.xp))
           }
-          hint={level.data?.next_xp ? `порог: ${formatNumber(level.data.next_xp)} XP` : "максимум"}
+          hint={level.data?.next_xp ? t("points.thresholdHint", { n: formatNumber(level.data.next_xp) }) : t("points.max")}
         />
       </div>
 
@@ -109,34 +111,34 @@ export default function PointsPage() {
             </div>
           ) : !txs.data || txs.data.items.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">
-              Транзакций пока нет
+              {t("points.noTransactions")}
             </p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Дата</TableHead>
-                  <TableHead>Описание</TableHead>
-                  <TableHead>Цель</TableHead>
-                  <TableHead className="text-right">Сумма</TableHead>
-                  <TableHead className="w-14 text-right">Валюта</TableHead>
+                  <TableHead>{t("points.date")}</TableHead>
+                  <TableHead>{t("points.description")}</TableHead>
+                  <TableHead>{t("points.goal")}</TableHead>
+                  <TableHead className="text-right">{t("points.sum")}</TableHead>
+                  <TableHead className="w-14 text-right">{t("points.currency")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {txs.data.items.map((t: Transaction) => (
-                  <TableRow key={t.id}>
+                {txs.data.items.map((tx: Transaction) => (
+                  <TableRow key={tx.id}>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                      {formatDateTime(t.created_at)}
+                      {formatDateTime(tx.created_at)}
                     </TableCell>
-                    <TableCell className="text-sm">{reasonLabel[t.reason] ?? t.reason}</TableCell>
+                    <TableCell className="text-sm">{reasonLabel(tx.reason)}</TableCell>
                     <TableCell className="max-w-[200px] truncate text-sm text-muted-foreground">
-                      {t.goal_title || "—"}
+                      {tx.goal_title || "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Amount amount={t.amount} />
+                      <Amount amount={tx.amount} />
                     </TableCell>
                     <TableCell className="text-right">
-                      <CurrencyPill currency={t.currency} />
+                      <CurrencyPill currency={tx.currency} />
                     </TableCell>
                   </TableRow>
                 ))}

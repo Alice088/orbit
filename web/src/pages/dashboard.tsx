@@ -2,10 +2,12 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowRight, Flame, ListChecks, Sparkles, Target, TrendingUp } from "lucide-react"
 import { Link } from "react-router-dom"
+import { useTranslation } from "react-i18next"
 import { api } from "@/lib/api"
 import { formatNumber, formatShortDate, greeting, weekRangeLabel } from "@/lib/format"
 import { MetricCard } from "@/components/shared/metric-card"
 import { ActivityItem } from "@/components/shared/activity-item"
+import { ProgressBar } from "@/components/shared/progress-bar"
 import { WeekNav } from "@/components/shared/week-nav"
 import { EmptyState } from "@/components/shared/page-header"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -17,11 +19,11 @@ import {
   ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
-  type ChartConfig,
 } from "@/components/ui/chart"
-import { Area, AreaChart, LabelList, RadialBar, RadialBarChart, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, XAxis, YAxis } from "recharts"
 
 export default function DashboardPage() {
+  const { t } = useTranslation()
   const [weeksBack, setWeeksBack] = useState(0)
   const today = useQuery({ queryKey: ["stats", "today"], queryFn: api.stats.today })
   const week = useQuery({
@@ -54,18 +56,9 @@ export default function DashboardPage() {
   const doneToday =
     (today.data?.tasks_completed ?? 0) + (today.data?.habits_completed ?? 0)
 
-  const visibleGoals = (goals.data ?? []).slice(0, 4)
-  const goalChartData = visibleGoals.map((g, i) => {
-    const prog = goalsWithProgress.data?.find((p) => p.goal_id === g.id)
-    return {
-      goal: g.title,
-      percent: prog?.percent ?? 0,
-      fill: `hsl(var(--chart-${i + 1}))`,
-    }
-  })
-  const goalChartConfig = Object.fromEntries(
-    goalChartData.map((d) => [d.goal, { label: d.goal }])
-  ) satisfies ChartConfig
+  const visibleGoals = (goals.data ?? [])
+    .filter((g) => g.status !== "completed")
+    .slice(0, 4)
   const totalEarned = visibleGoals.reduce((s, g) => {
     const p = goalsWithProgress.data?.find((x) => x.goal_id === g.id)
     return s + (p?.earned_gpp ?? 0)
@@ -79,40 +72,40 @@ export default function DashboardPage() {
       <div>
         <h2 className="text-xl font-semibold tracking-tight">{greeting()}.</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Вот твой прогресс по текущим целям.
+          {t("dashboard.subtitle")}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={Flame}
-          label="XP за сегодня"
+          label={t("dashboard.xpToday")}
           value={today.isLoading ? "—" : formatNumber(today.data?.xp_earned ?? 0)}
-          hint={today.data && today.data.penalty_xp !== 0 ? `штрафы: ${today.data.penalty_xp}` : undefined}
+          hint={today.data && today.data.penalty_xp !== 0 ? t("dashboard.penalties", { n: today.data.penalty_xp }) : undefined}
         />
         <MetricCard
           icon={Sparkles}
-          label="Уровень"
+          label={t("dashboard.level")}
           value={level.isLoading ? "—" : `${level.data?.level_name ?? ""}`}
           hint={level.data ? `${formatNumber(level.data.xp)} XP` : undefined}
         />
         <MetricCard
           icon={Target}
-          label="GPP за сегодня"
+          label={t("dashboard.gppToday")}
           value={today.isLoading ? "—" : formatNumber(today.data?.gpp_earned ?? 0)}
-          hint="прогресс целей"
+          hint={t("dashboard.goalProgress")}
         />
         <MetricCard
           icon={ListChecks}
-          label="Выполнено сегодня"
+          label={t("dashboard.doneToday")}
           value={today.isLoading ? "—" : formatNumber(doneToday)}
-          hint={today.data ? `${today.data.tasks_completed} задач · ${today.data.habits_completed} привычек` : undefined}
+          hint={today.data ? t("dashboard.doneHint", { tasks: today.data.tasks_completed, habits: today.data.habits_completed }) : undefined}
         />
       </div>
 
       <Card className="shadow-none">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-semibold">XP и GPP за неделю</CardTitle>
+          <CardTitle className="text-sm font-semibold">{t("dashboard.weekTitle")}</CardTitle>
           <WeekNav
             weeksBack={weeksBack}
             label={weekRangeLabel(week.data?.days, weeksBack)}
@@ -125,7 +118,7 @@ export default function DashboardPage() {
           ) : chartData.every((d) => d.xp === 0 && d.gpp === 0) ? (
             <div className="flex h-48 flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
               <TrendingUp className="size-5" />
-              <p>Пока нет данных за неделю</p>
+              <p>{t("dashboard.noWeekData")}</p>
             </div>
           ) : (
             <ChartContainer
@@ -186,98 +179,103 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card className="shadow-none">
+        <Card className="flex flex-col shadow-none">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold">Цели</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t("dashboard.goals")}</CardTitle>
             <Button asChild variant="ghost" size="sm">
               <Link to="/goals">
-                Все цели <ArrowRight className="size-3.5" />
+                {t("dashboard.allGoals")} <ArrowRight className="size-3.5" />
               </Link>
             </Button>
           </CardHeader>
-          <CardContent className="flex-1 pb-0">
+          <CardContent className="flex flex-1 flex-col justify-center">
             {goals.isLoading ? (
               <Skeleton className="h-56 w-full" />
-            ) : !goals.data || goals.data.length === 0 ? (
+            ) : visibleGoals.length === 0 ? (
               <EmptyState
                 icon={Target}
-                title="Целей пока нет"
-                description="Создай первую цель, чтобы начать отслеживать прогресс."
+                title={t("dashboard.noGoals")}
+                description={t("dashboard.noGoalsDesc")}
                 action={
                   <Button asChild size="sm">
-                    <Link to="/goals">Создать цель</Link>
+                    <Link to="/goals">{t("dashboard.createGoal")}</Link>
                   </Button>
                 }
               />
             ) : (
-              <ChartContainer
-                config={goalChartConfig}
-                className="mx-auto aspect-square max-h-[250px]"
-              >
-                <RadialBarChart
-                  data={goalChartData}
-                  startAngle={-90}
-                  endAngle={380}
-                  innerRadius={30}
-                  outerRadius={110}
-                >
-                  <ChartTooltip
-                    cursor={false}
-                    content={<ChartTooltipContent hideLabel nameKey="goal" />}
-                  />
-                  <RadialBar dataKey="percent" background>
-                    <LabelList
-                      position="insideStart"
-                      dataKey="goal"
-                      className="fill-white mix-blend-luminosity"
-                      fontSize={11}
-                    />
-                  </RadialBar>
-                </RadialBarChart>
-              </ChartContainer>
+              <div className="flex w-full flex-col gap-4">
+                {visibleGoals.map((g) => {
+                  const prog = goalsWithProgress.data?.find((p) => p.goal_id === g.id)
+                  const percent = prog?.percent ?? 0
+                  return (
+                    <Link key={g.id} to={`/goals/${g.id}`} className="group block">
+                      <div className="mb-1.5 flex items-center justify-between gap-3">
+                        <p className="truncate text-sm font-medium group-hover:underline">
+                          {g.title}
+                        </p>
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          {percent}%
+                        </span>
+                      </div>
+                      <ProgressBar value={percent} />
+                    </Link>
+                  )
+                })}
+              </div>
             )}
           </CardContent>
           {visibleGoals.length > 0 && (
             <CardFooter className="flex-col items-start gap-1 pt-4 text-sm">
               <div className="flex items-center gap-2 leading-none font-medium">
                 <Target className="size-3.5" />
-                Средний прогресс: {avgPercent}%
+                {t("dashboard.avgProgress", { percent: avgPercent })}
               </div>
               <div className="leading-none text-muted-foreground">
-                {formatNumber(totalEarned)} / {formatNumber(totalGPP)} GPP по{" "}
-                {visibleGoals.length}{" "}
-                {visibleGoals.length === 1 ? "цели" : "целям"}
+                {t("dashboard.across", {
+                  earned: formatNumber(totalEarned),
+                  total: formatNumber(totalGPP),
+                  count: visibleGoals.length,
+                })}
               </div>
             </CardFooter>
           )}
         </Card>
 
-        <Card className="shadow-none">
+        <Card className="flex flex-col shadow-none">
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold">Активность</CardTitle>
+            <CardTitle className="text-sm font-semibold">{t("dashboard.activity")}</CardTitle>
             <Button asChild variant="ghost" size="sm">
               <Link to="/activity">
-                Вся активность <ArrowRight className="size-3.5" />
+                {t("dashboard.allActivity")} <ArrowRight className="size-3.5" />
               </Link>
             </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative flex-1 overflow-hidden pb-0">
             {activity.isLoading ? (
               <Skeleton className="h-24 w-full" />
             ) : !activity.data || activity.data.items.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                Пока нет активности
+                {t("dashboard.noActivity")}
               </p>
             ) : (
-              <div className="flex flex-col">
-                {activity.data.items.slice(0, 5).map((e, i) => (
-                  <ActivityItem
-                    key={e.id}
-                    event={e}
-                    last={i === Math.min(5, activity.data.items.length) - 1}
-                  />
-                ))}
-              </div>
+              <>
+                <div
+                  className="flex flex-col"
+                  style={{
+                    maskImage: "linear-gradient(to bottom, black 45%, transparent 97%)",
+                    WebkitMaskImage: "linear-gradient(to bottom, black 45%, transparent 97%)",
+                  }}
+                >
+                  {activity.data.items.slice(0, 5).map((e, i) => (
+                    <ActivityItem
+                      key={e.id}
+                      event={e}
+                      last={i === Math.min(5, activity.data.items.length) - 1}
+                    />
+                  ))}
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background via-background/40 to-transparent backdrop-blur-[2px]" />
+              </>
             )}
           </CardContent>
         </Card>

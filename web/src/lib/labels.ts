@@ -1,66 +1,42 @@
-export const goalStatusLabel: Record<string, string> = {
-  active: "Активная",
-  paused: "На паузе",
-  completed: "Завершена",
+import i18n, { isEn } from "@/lib/i18n"
+
+export function goalStatusLabel(status: string): string {
+  return i18n.t(`labels.goalStatus.${status}`)
 }
 
-export const difficultyLabel: Record<string, string> = {
-  easy: "Лёгкая",
-  normal: "Обычная",
-  hard: "Сложная",
-  epic: "Эпическая",
+export function difficultyLabel(difficulty: string): string {
+  return i18n.t(`labels.difficulty.${difficulty}`)
 }
 
-export const difficultyMultiplierLabel: Record<string, string> = {
-  easy: "×0.5",
-  normal: "×1",
-  hard: "×1.5",
-  epic: "×2",
+export function difficultyMultiplierLabel(difficulty: string): string {
+  return i18n.t(`labels.difficultyMultiplier.${difficulty}`)
 }
 
-export const taskStatusLabel: Record<string, string> = {
-  open: "Открыта",
-  completed: "Выполнена",
+export function difficultyOptions(): { value: string; label: string; multiplier: string }[] {
+  return ["easy", "normal", "hard", "epic"].map((value) => ({
+    value,
+    label: difficultyLabel(value),
+    multiplier: difficultyMultiplierLabel(value),
+  }))
 }
 
-export const reasonLabel: Record<string, string> = {
-  task_completed: "Задача выполнена",
-  habit_completed: "Привычка выполнена",
-  streak_milestone: "Бонус серии",
-  habit_missed_twice: "Пропуск дважды",
-  inactivity: "Длительная неактивность",
-  goal_regression: "Регресс цели",
-  manual_penalty: "Штраф",
+export function taskStatusLabel(status: string): string {
+  return i18n.t(`labels.taskStatus.${status}`)
 }
 
-export const eventLabel: Record<string, string> = {
-  task_completed: "Задача выполнена",
-  task_regressed: "Задача откачена",
-  task_deleted: "Задача удалена",
-  habit_completed: "Привычка выполнена",
-  habit_deleted: "Привычка удалена",
-  goal_created: "Цель создана",
-  goal_reviewed: "Цель пересмотрена",
-  goal_deleted: "Цель удалена",
-  manual_checkin: "Чекин",
-  manual_penalty: "Штраф",
-  daily_settlement: "Ежедневный расчёт",
-  inactivity_penalty: "Штраф за неактивность",
-  achievement_unlocked: "Достижение открыто",
-  streak_advanced: "Серия продлена",
+export function reasonLabel(reason: string): string {
+  return i18n.t(`labels.reason.${reason}`)
 }
 
-export const ACHIEVEMENTS: { code: string; title: string }[] = [
-  { code: "reading_7", title: "Неделя чтения" },
-  { code: "reading_30", title: "Месяц чтения" },
-  { code: "reading_100", title: "100 дней чтения" },
-  { code: "workout_7", title: "Неделя тренировок" },
-  { code: "workout_30", title: "Месяц тренировок" },
-  { code: "workout_100", title: "100 дней тренировок" },
-]
+export function eventLabel(eventType: string): string {
+  return i18n.t(`labels.event.${eventType}`)
+}
 
 export function achievementTitle(code: string): string {
-  return ACHIEVEMENTS.find((a) => a.code === code)?.title ?? code
+  const known = i18n.exists(`labels.achievement.${code}`)
+  const title = known ? i18n.t(`labels.achievement.${code}`) : code
+  if (isEn()) return title.replace(/ урв\./g, " lvl.")
+  return title
 }
 
 export function eventDescription(event: {
@@ -83,7 +59,7 @@ export function eventDescription(event: {
       if (typeof event.payload.awarded === "number" && event.payload.awarded > 0)
         parts.push(`+${event.payload.awarded} XP`)
       if (typeof event.payload.streak_days === "number" && event.payload.streak_days > 0)
-        parts.push(`серия ${event.payload.streak_days} дн`)
+        parts.push(i18n.t("labels.streakDays", { count: event.payload.streak_days }))
       return parts.join(" · ")
     }
     case "goal_created":
@@ -103,8 +79,9 @@ export function eventDescription(event: {
         parts.push(event.payload.reason)
       }
       return parts.join(" · ")
-    }    case "achievement_unlocked":
-      return event.payload.habit_id ? "новое достижение" : ""
+    }
+    case "achievement_unlocked":
+      return event.payload.habit_id ? i18n.t("labels.newAchievement") : ""
     default:
       return ""
   }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useTranslation } from "react-i18next"
 import {
   ArrowLeft,
   CalendarCheck,
@@ -27,6 +28,7 @@ export default function GoalDetailPage() {
   const { goalId } = useParams<{ goalId: string }>()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const { t } = useTranslation()
 
   const goal = useQuery({
     queryKey: ["goals", goalId],
@@ -48,7 +50,7 @@ export default function GoalDetailPage() {
     mutationFn: () => api.goals.review(goalId!),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["activity"] })
-      toast.success("Цель пересмотрена")
+      toast.success(t("goalDetail.reviewed"))
     },
   })
 
@@ -60,7 +62,7 @@ export default function GoalDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["stats"] })
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
       queryClient.invalidateQueries({ queryKey: ["activity"] })
-      toast.success("Задача выполнена")
+      toast.success(t("goalDetail.taskCompleted"))
     },
     onError: (err) => toast.error(err.message),
   })
@@ -73,7 +75,7 @@ export default function GoalDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["stats"] })
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
       queryClient.invalidateQueries({ queryKey: ["activity"] })
-      toast.success("Задача удалена")
+      toast.success(t("goalDetail.taskDeleted"))
     },
     onError: (err) => toast.error(err.message),
   })
@@ -84,7 +86,7 @@ export default function GoalDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["goals"] })
       queryClient.invalidateQueries({ queryKey: ["tasks"] })
       navigate("/goals")
-      toast.success("Цель удалена")
+      toast.success(t("goalDetail.goalDeleted"))
     },
     onError: (err) => toast.error(err.message),
   })
@@ -106,29 +108,29 @@ export default function GoalDetailPage() {
       <Button asChild variant="ghost" size="sm" className="w-fit">
         <Link to="/goals">
           <ArrowLeft className="size-4" />
-          Все цели
+          {t("goalDetail.backToGoals")}
         </Link>
       </Button>
 
       <PageHeader
         title={g.title}
-        description={`Создана ${formatDate(g.created_at)}`}
+        description={t("goalDetail.created", { date: formatDate(g.created_at) })}
         actions={
           <>
             <Button variant="outline" size="sm" onClick={() => review.mutate()}>
               <CalendarCheck className="size-4" />
-              Пересмотреть цель
+              {t("goalDetail.review")}
             </Button>
             <TaskCreateDialog presetGoalId={g.id} />
             <PenaltyDialog />
             <ConfirmDialog
-              title="Удалить цель?"
-              description={`Цель «${g.title}» и её задачи будут удалены. Заработанный XP останется.`}
+              title={t("goalDetail.deleteGoalTitle")}
+              description={t("goalDetail.deleteGoalDesc", { title: g.title })}
               onConfirm={() => removeGoal.mutate()}
               trigger={
                 <Button variant="ghost" size="sm">
                   <Trash2 className="size-4" />
-                  Удалить
+                  {t("common.delete")}
                 </Button>
               }
             />
@@ -146,12 +148,12 @@ export default function GoalDetailPage() {
               <div>
                 <p className="text-2xl font-semibold tabular-nums">{p.percent}%</p>
                 <p className="text-sm text-muted-foreground">
-                  {formatNumber(p.earned_gpp)} из {formatNumber(g.total_gpp)} GPP
+                  {t("goalDetail.earned", { earned: formatNumber(p.earned_gpp), total: formatNumber(g.total_gpp) })}
                 </p>
               </div>
             </div>
             <StatusBadge
-              label={goalStatusLabel[g.status] ?? g.status}
+              label={goalStatusLabel(g.status)}
               variant={g.status === "completed" ? "completed" : g.status === "paused" ? "paused" : "active"}
             />
           </div>
@@ -161,7 +163,7 @@ export default function GoalDetailPage() {
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Вехи</CardTitle>
+          <CardTitle className="text-sm font-semibold">{t("goalDetail.milestones")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2.5">
           {milestones.map((m) => {
@@ -190,63 +192,63 @@ export default function GoalDetailPage() {
 
       <Card className="shadow-none">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Задачи</CardTitle>
+          <CardTitle className="text-sm font-semibold">{t("goalDetail.tasks")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {tasks.isLoading ? (
             <Skeleton className="h-20 w-full" />
           ) : open.length === 0 && completed.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              Задач пока нет — создай первую
+              {t("goalDetail.noTasks")}
             </p>
           ) : (
             <>
-              {open.map((t) => (
+              {open.map((task) => (
                 <div
-                  key={t.id}
+                  key={task.id}
                   className="flex items-center justify-between gap-3 rounded-md border px-3 py-2.5"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{t.title}</p>
+                    <p className="truncate text-sm font-medium">{task.title}</p>
                     <p className="text-xs text-muted-foreground">
-                      {difficultyLabel[t.difficulty] ?? t.difficulty}
-                      {t.gpp_reward > 0 ? ` · +${t.gpp_reward} GPP` : ""}
+                      {difficultyLabel(task.difficulty)}
+                      {task.gpp_reward > 0 ? ` · +${task.gpp_reward} GPP` : ""}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <ConfirmDialog
-                      title="Удалить задачу?"
-                      description={`Задача «${t.title}» будет удалена.`}
-                      onConfirm={() => removeTask.mutate(t.id)}
+                      title={t("goalDetail.deleteTaskTitle")}
+                      description={t("goalDetail.deleteTaskDesc", { title: task.title })}
+                      onConfirm={() => removeTask.mutate(task.id)}
                       trigger={
-                        <Button variant="ghost" size="icon" aria-label="Удалить задачу">
+                        <Button variant="ghost" size="icon" aria-label={t("goalDetail.deleteTaskAria")}>
                           <Trash2 className="size-4" />
                         </Button>
                       }
                     />
-                    <Button size="sm" onClick={() => completeTask.mutate(t.id)}>
+                    <Button size="sm" onClick={() => completeTask.mutate(task.id)}>
                       <CheckCircle2 className="size-4" />
-                      Выполнить
+                      {t("goalDetail.complete")}
                     </Button>
                   </div>
                 </div>
               ))}
-              {completed.map((t) => (
+              {completed.map((task) => (
                 <div
-                  key={t.id}
+                  key={task.id}
                   className="flex items-center justify-between gap-3 rounded-md border bg-muted/40 px-3 py-2.5 opacity-60"
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     <Check className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                    <p className="truncate text-sm font-medium line-through">{t.title}</p>
+                    <p className="truncate text-sm font-medium line-through">{task.title}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     <ConfirmDialog
-                      title="Удалить выполненную задачу?"
-                      description={`Награда задачи «${t.title}» будет возвращена: XP и GPP пересчитаются.`}
-                      onConfirm={() => removeTask.mutate(t.id)}
+                      title={t("goalDetail.deleteCompletedTitle")}
+                      description={t("goalDetail.deleteCompletedDesc", { title: task.title })}
+                      onConfirm={() => removeTask.mutate(task.id)}
                       trigger={
-                        <Button variant="ghost" size="icon" aria-label="Удалить задачу">
+                        <Button variant="ghost" size="icon" aria-label={t("goalDetail.deleteTaskAria")}>
                           <Trash2 className="size-4" />
                         </Button>
                       }
@@ -259,7 +261,7 @@ export default function GoalDetailPage() {
           {open.length > 0 && (
             <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
               <ListChecks className="size-3.5" />
-              {open.length} открытых · {completed.length} выполненных
+              {t("goalDetail.openCount", { open: open.length, completed: completed.length, count: open.length })}
             </div>
           )}
         </CardContent>

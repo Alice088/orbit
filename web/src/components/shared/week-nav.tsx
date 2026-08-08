@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useTranslation } from "react-i18next"
 
 export function WeekNav({
   weeksBack,
@@ -10,13 +11,14 @@ export function WeekNav({
   label: string
   onChange: (weeksBack: number) => void
 }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-1">
       <Button
         variant="ghost"
         size="icon"
         onClick={() => onChange(weeksBack + 1)}
-        aria-label="Предыдущая неделя"
+        aria-label={t("weekNav.prev")}
       >
         <ChevronLeft className="size-4" />
       </Button>
@@ -28,7 +30,7 @@ export function WeekNav({
         size="icon"
         disabled={weeksBack <= 0}
         onClick={() => onChange(weeksBack - 1)}
-        aria-label="Следующая неделя"
+        aria-label={t("weekNav.next")}
       >
         <ChevronRight className="size-4" />
       </Button>

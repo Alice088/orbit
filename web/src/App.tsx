@@ -11,6 +11,7 @@ import HabitsPage from "@/pages/habits"
 import ActivityPage from "@/pages/activity"
 import PointsPage from "@/pages/points"
 import AnalyticsPage from "@/pages/analytics"
+import DocsPage from "@/pages/docs"
 import SettingsPage from "@/pages/settings"
 
 function useAuthed(): boolean {
@@ -46,6 +47,7 @@ export default function App() {
           <Route path="activity" element={<ActivityPage />} />
           <Route path="points" element={<PointsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="docs" element={<DocsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
