@@ -1,5 +1,6 @@
 const API_BASE = "/api"
 const TOKEN_KEY = "orbit_token"
+const NAME_KEY = "orbit_name"
 
 export class ApiError extends Error {
   status: number
@@ -21,9 +22,17 @@ export function setToken(token: string | null) {
   }
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+export function getStoredName(): string | null {
+  return localStorage.getItem(NAME_KEY)
+}
+
+export function setStoredName(name: string) {
+  localStorage.setItem(NAME_KEY, name)
+}
+
+async function fetchWithToken(path: string, init?: RequestInit): Promise<Response> {
   const token = getToken()
-  const res = await fetch(API_BASE + path, {
+  return fetch(API_BASE + path, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -31,6 +40,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     },
   })
+}
+
+async function refreshSession(name: string): Promise<boolean> {
+  try {
+    const res = await fetch(API_BASE + "/v1/auth/session", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    })
+    if (!res.ok) return false
+    const data = (await res.json()) as AuthResponse
+    setToken(data.access_token)
+    window.dispatchEvent(new Event("orbit:authed"))
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let res = await fetchWithToken(path, init)
+  if (res.status === 401) {
+    const name = getStoredName()
+    if (name && (await refreshSession(name))) {
+      res = await fetchWithToken(path, init)
+    }
+  }
   if (res.status === 401) {
     setToken(null)
     window.dispatchEvent(new Event("orbit:unauthorized"))

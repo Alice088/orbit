@@ -26,7 +26,7 @@ export default function TasksPage() {
 
   const tasks = useQuery({
     queryKey: ["tasks", filter, page],
-    queryFn: () => api.tasks.list(filter, 20, (page - 1) * 20),
+    queryFn: () => api.tasks.list(filter === "all" ? "" : filter, 20, (page - 1) * 20),
   })
   const goals = useQuery({ queryKey: ["goals"], queryFn: api.goals.list })
   const goalTitle = new Map((goals.data ?? []).map((g) => [g.id, g.title]))

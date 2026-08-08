@@ -3,7 +3,7 @@ import { Target } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
-import { api, ApiError, setToken } from "@/lib/api"
+import { api, ApiError, setStoredName, setToken } from "@/lib/api"
 import { setLanguage } from "@/lib/i18n"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +23,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const res = await api.session(name)
+      setStoredName(name.trim())
       setToken(res.access_token)
       window.dispatchEvent(new Event("orbit:authed"))
       navigate("/", { replace: true })

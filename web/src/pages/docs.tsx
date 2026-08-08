@@ -6,7 +6,9 @@ import remarkGfm from "remark-gfm"
 import { BookOpen, Boxes, FlaskConical } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { implGroups } from "@/lib/docs-data"
-import report from "../../../docs/deep-research-report.md?raw"
+import { isEn } from "@/lib/i18n"
+import reportRu from "../../../docs/deep-research-report.md?raw"
+import reportEn from "../../../docs/deep-research-report.en.md?raw"
 
 function slugify(s: string): string {
   return s
@@ -126,6 +128,7 @@ export default function DocsPage() {
     window.scrollTo({ top: 0 })
   }
 
+  const report = isEn() ? reportEn : reportRu
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

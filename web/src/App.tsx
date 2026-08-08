@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
-import { getToken } from "@/lib/api"
+import { api, getStoredName, getToken, setToken } from "@/lib/api"
 import { AppShell } from "@/components/layout/app-shell"
 import LoginPage from "@/pages/login"
 import DashboardPage from "@/pages/dashboard"
@@ -14,11 +14,15 @@ import AnalyticsPage from "@/pages/analytics"
 import DocsPage from "@/pages/docs"
 import SettingsPage from "@/pages/settings"
 
-function useAuthed(): boolean {
-  const [authed, setAuthed] = useState(() => getToken() !== null)
+type AuthState = "loading" | "authed" | "anon"
+
+function useAuthed(): AuthState {
+  const [state, setState] = useState<AuthState>(() =>
+    getToken() ? "authed" : "loading",
+  )
   useEffect(() => {
-    const onUnauthorized = () => setAuthed(false)
-    const onAuthed = () => setAuthed(true)
+    const onUnauthorized = () => setState("anon")
+    const onAuthed = () => setState("authed")
     window.addEventListener("orbit:unauthorized", onUnauthorized)
     window.addEventListener("orbit:authed", onAuthed)
     return () => {
@@ -26,18 +30,47 @@ function useAuthed(): boolean {
       window.removeEventListener("orbit:authed", onAuthed)
     }
   }, [])
-  return authed
+  useEffect(() => {
+    if (getToken()) {
+      setState("authed")
+      return
+    }
+    const name = getStoredName()
+    if (!name) {
+      setState("anon")
+      return
+    }
+    let cancelled = false
+    api
+      .session(name)
+      .then((res) => {
+        if (cancelled) return
+        setToken(res.access_token)
+        window.dispatchEvent(new Event("orbit:authed"))
+      })
+      .catch(() => {
+        if (!cancelled) setState("anon")
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+  return state
 }
 
 export default function App() {
   const authed = useAuthed()
+  if (authed === "loading") {
+    return <div className="min-h-screen bg-background" />
+  }
+  const isAuthed = authed === "authed"
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={authed ? <Navigate to="/" replace /> : <LoginPage />} />
+        <Route path="/login" element={isAuthed ? <Navigate to="/" replace /> : <LoginPage />} />
         <Route
           path="/"
-          element={authed ? <AppShell /> : <Navigate to="/login" replace />}
+          element={isAuthed ? <AppShell /> : <Navigate to="/login" replace />}
         >
           <Route index element={<DashboardPage />} />
           <Route path="goals" element={<GoalsPage />} />

@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom"
+import { NavLink, Link, Outlet, useLocation, useNavigate } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import {
   Activity,
@@ -9,7 +9,6 @@ import {
   Coins,
   LayoutDashboard,
   ListChecks,
-  LogOut,
   Menu,
   Moon,
   Repeat,
@@ -21,19 +20,9 @@ import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useQuery } from "@tanstack/react-query"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { api, setToken } from "@/lib/api"
+import { api } from "@/lib/api"
 import { implGroups, theoryToc } from "@/lib/docs-data"
-import { isEn } from "@/lib/i18n"
 import { useSearchParams } from "react-router-dom"
 import { isEn, setLanguage } from "@/lib/i18n"
 import { useEffect } from "react"
@@ -298,37 +287,17 @@ function ThemeToggle() {
 }
 
 function UserMenu() {
-  const navigate = useNavigate()
   const { t } = useTranslation()
   const me = useQuery({ queryKey: ["me"], queryFn: api.me })
   const name = me.data?.name ?? ""
   const initial = name ? name[0].toUpperCase() : "O"
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full" aria-label={t("common.profile")}>
-          <Avatar className="size-8">
-            <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
-              {initial}
-            </AvatarFallback>
-          </Avatar>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel className="font-medium">{name || t("common.profile")}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => {
-            setToken(null)
-            window.dispatchEvent(new Event("orbit:unauthorized"))
-            navigate("/login")
-          }}
-        >
-          <LogOut className="size-4" />
-          {t("common.signOut")}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div
+      className="flex size-8 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground"
+      title={name || t("common.profile")}
+    >
+      {initial}
+    </div>
   )
 }
 

@@ -1,6 +1,6 @@
 # Orbit
 
-A gamified personal life OS. Single-user, two progress dimensions: **GPP** (goal progress point) and **XP** (level). Track goals, habits, and tasks; earn points; watch your kitty rank grow from Beginner Kitty to Orbit Legend.
+A self-hosted gamified personal life OS. Single-user, two progress dimensions: **GPP** (goal progress point) and **XP** (level). Track goals, habits, and tasks; earn points; watch your kitty rank grow from Beginner Kitty to Orbit Legend.
 
 ## Quick Start
 
@@ -13,6 +13,21 @@ docker compose up --build -d
 - Postgres: localhost:5432 (orbit / orbit / orbit)
 
 Migrations run automatically on first boot. Open the UI, type any name — the account is created on first login (login by the same name).
+
+## Screenshots
+
+![Dashboard](assets/img.png)
+![Goals](assets/img_1.png)
+![Goal detail](assets/img_2.png)
+![Tasks](assets/img_3.png)
+![Tasks creating](assets/img_11.png)
+![Habits](assets/img_4.png)
+![Activity](assets/img_5.png)
+![Points](assets/img_6.png)
+![Analytics](assets/img_7.png)
+![Settings](assets/img_8.png)
+![Docs](assets/img_9.png)
+![Login](assets/img_10.png)
 
 ## How It Works
 
