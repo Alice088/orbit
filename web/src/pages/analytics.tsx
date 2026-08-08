@@ -13,7 +13,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { Bar, BarChart, XAxis, YAxis } from "recharts"
+import { Bar, BarChart, LabelList, XAxis } from "recharts"
 
 export default function AnalyticsPage() {
   const [weeksBack, setWeeksBack] = useState(0)
@@ -98,22 +98,23 @@ export default function AnalyticsPage() {
             config={{ xp: { label: "XP", color: "hsl(var(--foreground))" } }}
             className="h-52 w-full"
           >
-            <BarChart data={weekData} margin={{ left: -20, right: 4, top: 4, bottom: 0 }}>
+            <BarChart accessibilityLayer data={weekData} margin={{ top: 24 }}>
               <XAxis
                 dataKey="day"
                 tickLine={false}
+                tickMargin={10}
                 axisLine={false}
                 tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                dy={6}
               />
-              <YAxis
-                tickLine={false}
-                axisLine={false}
-                tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-                allowDecimals={false}
-              />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="xp" fill="hsl(var(--foreground))" radius={[2, 2, 0, 0]} maxBarSize={28} />
+              <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+              <Bar dataKey="xp" fill="var(--color-xp)" radius={8} maxBarSize={32}>
+                <LabelList
+                  position="top"
+                  offset={12}
+                  className="fill-foreground"
+                  fontSize={12}
+                />
+              </Bar>
             </BarChart>
           </ChartContainer>
         </CardContent>
