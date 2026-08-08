@@ -1,16 +1,23 @@
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { Activity as ActivityIcon } from "lucide-react"
 import { api } from "@/lib/api"
 import { formatDate } from "@/lib/format"
 import { PageHeader, EmptyState } from "@/components/shared/page-header"
 import { ActivityItem } from "@/components/shared/activity-item"
+import { Pagination } from "@/components/shared/pagination"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export default function ActivityPage() {
-  const activity = useQuery({ queryKey: ["activity"], queryFn: api.stats.activity })
+  const [page, setPage] = useState(1)
+  const limit = 20
+  const activity = useQuery({
+    queryKey: ["activity", page],
+    queryFn: () => api.stats.activity(limit, (page - 1) * limit),
+  })
 
-  const grouped = new Map<string, NonNullable<typeof activity.data>>()
-  for (const e of activity.data ?? []) {
+  const grouped = new Map<string, NonNullable<typeof activity.data>["items"]>()
+  for (const e of activity.data?.items ?? []) {
     const day = formatDate(e.occurred_at)
     const list = grouped.get(day) ?? []
     list.push(e)
@@ -25,7 +32,7 @@ export default function ActivityPage() {
       />
       {activity.isLoading ? (
         <Skeleton className="h-64 w-full" />
-      ) : !activity.data || activity.data.length === 0 ? (
+      ) : !activity.data || activity.data.items.length === 0 ? (
         <EmptyState
           icon={ActivityIcon}
           title="Пока тихо"
@@ -45,6 +52,16 @@ export default function ActivityPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+      {activity.data && activity.data.total > limit && (
+        <div className="mt-6">
+          <Pagination
+            page={page}
+            total={activity.data.total}
+            limit={limit}
+            onChange={setPage}
+          />
         </div>
       )}
     </div>

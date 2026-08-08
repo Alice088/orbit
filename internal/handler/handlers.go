@@ -9,6 +9,7 @@ import (
 	"orbit/internal/entity"
 	"orbit/internal/middleware"
 	"orbit/internal/service"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -39,6 +40,35 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 
 func writeError(w http.ResponseWriter, status int, msg string) {
 	writeJSON(w, status, map[string]string{"error": msg})
+}
+
+func pageParams(r *http.Request, defLimit, maxLimit int) (int, int) {
+	limit := defLimit
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	if maxLimit > 0 && limit > maxLimit {
+		limit = maxLimit
+	}
+	offset := 0
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			offset = n
+		}
+	}
+	return limit, offset
+}
+
+func weeksParam(r *http.Request) int {
+	n := 0
+	if v := r.URL.Query().Get("weeks"); v != "" {
+		if k, err := strconv.Atoi(v); err == nil && k > 0 {
+			n = k
+		}
+	}
+	return n
 }
 
 func statusFor(err error) int {
@@ -206,7 +236,9 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.svc.ListTasks(r.Context(), middleware.GetUserID(r.Context()))
+	status := r.URL.Query().Get("status")
+	limit, offset := pageParams(r, 0, 100)
+	tasks, total, err := h.svc.ListTasks(r.Context(), middleware.GetUserID(r.Context()), status, limit, offset)
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -215,7 +247,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	for i := range tasks {
 		out = append(out, taskResponse(&tasks[i]))
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, dto.TaskPageResponse{Items: out, Total: total})
 }
 
 func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -343,7 +375,7 @@ func (h *StatsHandler) Today(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *StatsHandler) Week(w http.ResponseWriter, r *http.Request) {
-	week, err := h.svc.WeekStats(r.Context(), middleware.GetUserID(r.Context()))
+	week, err := h.svc.WeekStats(r.Context(), middleware.GetUserID(r.Context()), weeksParam(r))
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -396,7 +428,7 @@ func (h *StatsHandler) Achievements(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *StatsHandler) Analytics(w http.ResponseWriter, r *http.Request) {
-	a, err := h.svc.Analytics(r.Context(), middleware.GetUserID(r.Context()))
+	a, err := h.svc.Analytics(r.Context(), middleware.GetUserID(r.Context()), weeksParam(r))
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -433,7 +465,8 @@ func (h *StatsHandler) Penalty(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *StatsHandler) Activity(w http.ResponseWriter, r *http.Request) {
-	events, err := h.svc.RecentActivity(r.Context(), middleware.GetUserID(r.Context()), 50)
+	limit, offset := pageParams(r, 20, 100)
+	events, total, err := h.svc.RecentActivity(r.Context(), middleware.GetUserID(r.Context()), limit, offset)
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -446,11 +479,12 @@ func (h *StatsHandler) Activity(w http.ResponseWriter, r *http.Request) {
 			OccurredAt: e.OccurredAt.Format("2006-01-02T15:04:05Z07:00"),
 		})
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, dto.ActivityPageResponse{Items: out, Total: total})
 }
 
 func (h *StatsHandler) Transactions(w http.ResponseWriter, r *http.Request) {
-	txs, err := h.svc.ListTransactions(r.Context(), middleware.GetUserID(r.Context()), 100)
+	limit, offset := pageParams(r, 20, 100)
+	txs, total, err := h.svc.ListTransactions(r.Context(), middleware.GetUserID(r.Context()), limit, offset)
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -464,7 +498,7 @@ func (h *StatsHandler) Transactions(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, res)
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, dto.TransactionPageResponse{Items: out, Total: total})
 }
 
 func summaryResponse(s *service.DailySummary) dto.DailyStatsResponse {

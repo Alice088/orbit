@@ -118,15 +118,15 @@ type CategoryXP struct {
 	XP       int
 }
 
-func (r *StatsRepo) HabitXPByCategory(ctx context.Context, userID string, from string) ([]CategoryXP, error) {
+func (r *StatsRepo) HabitXPByCategory(ctx context.Context, userID string, from, to string) ([]CategoryXP, error) {
 	rows, err := r.q.Query(ctx,
 		`SELECT COALESCE(h.category, ''), COALESCE(sum(pt.amount), 0)
 		 FROM point_transactions pt
 		 JOIN domain_events ev ON pt.domain_event_id = ev.id
 		 JOIN habits h ON ev.aggregate_id = h.id
 		 WHERE pt.user_id = $1 AND pt.currency = 'xp' AND ev.event_type = 'habit_completed'
-		   AND pt.created_at::date >= $2
-		 GROUP BY h.category ORDER BY 2 DESC`, userID, from)
+		   AND pt.created_at::date >= $2 AND pt.created_at::date <= $3
+		 GROUP BY h.category ORDER BY 2 DESC`, userID, from, to)
 	if err != nil {
 		return nil, err
 	}
@@ -142,11 +142,11 @@ func (r *StatsRepo) HabitXPByCategory(ctx context.Context, userID string, from s
 	return out, rows.Err()
 }
 
-func (r *StatsRepo) TaskXPInRange(ctx context.Context, userID string, from string) (int, error) {
+func (r *StatsRepo) TaskXPInRange(ctx context.Context, userID string, from, to string) (int, error) {
 	var sum int
 	err := r.q.QueryRow(ctx,
 		`SELECT COALESCE(sum(amount), 0) FROM point_transactions
 		 WHERE user_id = $1 AND currency = 'xp' AND reason = 'task_completed'
-		   AND created_at::date >= $2`, userID, from).Scan(&sum)
+		   AND created_at::date >= $2 AND created_at::date <= $3`, userID, from, to).Scan(&sum)
 	return sum, err
 }

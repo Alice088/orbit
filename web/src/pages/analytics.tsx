@@ -1,8 +1,10 @@
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { BarChart3, Flame, Scale, Target } from "lucide-react"
 import { api } from "@/lib/api"
-import { formatNumber, formatShortDate } from "@/lib/format"
+import { formatNumber, formatShortDate, weekRangeLabel } from "@/lib/format"
 import { PageHeader } from "@/components/shared/page-header"
+import { WeekNav } from "@/components/shared/week-nav"
 import { MetricCard } from "@/components/shared/metric-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -14,9 +16,10 @@ import {
 import { Bar, BarChart, XAxis, YAxis } from "recharts"
 
 export default function AnalyticsPage() {
+  const [weeksBack, setWeeksBack] = useState(0)
   const analytics = useQuery({
-    queryKey: ["analytics"],
-    queryFn: api.stats.analytics,
+    queryKey: ["analytics", weeksBack],
+    queryFn: () => api.stats.analytics(weeksBack),
   })
 
   if (analytics.isLoading) {
@@ -51,6 +54,13 @@ export default function AnalyticsPage() {
       <PageHeader
         title="Аналитика"
         description="Недельные показатели: сколько XP ты наработал и на что они ушли."
+        actions={
+          <WeekNav
+            weeksBack={weeksBack}
+            label={weekRangeLabel(a.week.days, weeksBack)}
+            onChange={setWeeksBack}
+          />
+        }
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard

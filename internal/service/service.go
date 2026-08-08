@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"orbit/internal/engine/economy"
 	"orbit/internal/engine/level"
 	"orbit/internal/engine/penalty"
@@ -28,6 +29,8 @@ var (
 	ErrAccountNotFound  = errors.New("аккаунт с таким именем не найден")
 	ErrHabitDoneToday   = errors.New("привычка уже выполнена сегодня")
 )
+
+const maxMilestoneRepeatLevel = 99999999
 
 type GameSettings struct {
 	Timezone             string
@@ -381,17 +384,40 @@ func (s *Service) CompleteHabit(ctx context.Context, userID string, habitID stri
 		bonus := 0
 		achievementCode := ""
 		if habit.StreakTracking {
-			ms := make([]streak.Milestone, 0, len(habit.StreakMilestones))
-			for _, m := range habit.StreakMilestones {
-				ms = append(ms, streak.Milestone{Days: m.Days, BonusXP: m.BonusXP})
-			}
-			if b, ok := streak.MilestoneBonus(ms, state.CurrentDays); ok {
-				bonus = b
-			}
-			for _, m := range habit.StreakMilestones {
-				if m.Days == state.CurrentDays {
-					achievementCode = m.AchievementCode
+			for i, m := range habit.StreakMilestones {
+				level, err := store.Habit.MaxMilestoneLevel(ctx, userID, habitID, i)
+				if err != nil {
+					return err
+				}
+				next := level + 1
+				if next >= maxMilestoneRepeatLevel {
+					if err := store.Habit.Delete(ctx, habitID); err != nil {
+						return err
+					}
 					break
+				}
+				if state.CurrentDays < streak.ScaledThreshold(m.Days, next) {
+					continue
+				}
+				scaled := streak.ScaledThreshold(m.BonusXP, next)
+				cleared, err := store.Habit.InsertMilestoneClear(ctx, userID, habitID, i, next, scaled)
+				if err != nil {
+					return err
+				}
+				if !cleared {
+					continue
+				}
+				bonus += scaled
+				code := m.AchievementCode
+				if next > 1 {
+					code = fmt.Sprintf("%s урв.%d", habit.Title, next)
+				}
+				unlocked, err := store.Stats.UnlockAchievementIfAbsent(ctx, userID, code)
+				if err != nil {
+					return err
+				}
+				if unlocked {
+					achievementCode = code
 				}
 			}
 		}
@@ -666,21 +692,37 @@ func (s *Service) GoalDetail(ctx context.Context, userID string, goalID string) 
 	return &GoalDetail{Goal: *goal, Milestones: milestones, EarnedGPP: earned}, nil
 }
 
-func (s *Service) ListTasks(ctx context.Context, userID string) ([]entity.Task, error) {
+func (s *Service) ListTasks(ctx context.Context, userID string, status string, limit, offset int) ([]entity.Task, int, error) {
 	store := repository.NewStore(s.pool)
-	return store.Task.ListByUser(ctx, userID)
-}
-
-func (s *Service) RecentActivity(ctx context.Context, userID string, limit int) ([]entity.DomainEvent, error) {
-	store := repository.NewStore(s.pool)
-	return store.Event.ListRecent(ctx, userID, limit)
-}
-
-func (s *Service) ListTransactions(ctx context.Context, userID string, limit int) ([]Transaction, error) {
-	store := repository.NewStore(s.pool)
-	rows, err := store.Ledger.ListRecent(ctx, userID, limit)
+	tasks, err := store.Task.ListByUser(ctx, userID, status, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+	total, err := store.Task.Count(ctx, userID, status)
+	if err != nil {
+		return nil, 0, err
+	}
+	return tasks, total, nil
+}
+
+func (s *Service) RecentActivity(ctx context.Context, userID string, limit, offset int) ([]entity.DomainEvent, int, error) {
+	store := repository.NewStore(s.pool)
+	events, err := store.Event.ListRecent(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	total, err := store.Event.Count(ctx, userID)
+	if err != nil {
+		return nil, 0, err
+	}
+	return events, total, nil
+}
+
+func (s *Service) ListTransactions(ctx context.Context, userID string, limit, offset int) ([]Transaction, int, error) {
+	store := repository.NewStore(s.pool)
+	rows, err := store.Ledger.ListRecent(ctx, userID, limit, offset)
+	if err != nil {
+		return nil, 0, err
 	}
 	out := make([]Transaction, 0, len(rows))
 	for _, r := range rows {
@@ -689,7 +731,11 @@ func (s *Service) ListTransactions(ctx context.Context, userID string, limit int
 			GoalID: r.GoalID, GoalTitle: r.GoalTitle, CreatedAt: r.CreatedAt,
 		})
 	}
-	return out, nil
+	total, err := store.Ledger.Count(ctx, userID)
+	if err != nil {
+		return nil, 0, err
+	}
+	return out, total, nil
 }
 
 func (s *Service) AddPenalty(ctx context.Context, userID string, amount int, reason string, currency entity.Currency, goalID string) error {
@@ -901,10 +947,11 @@ func (s *Service) TodayStats(ctx context.Context, userID string) (*DailySummary,
 	return toSummary(stats), nil
 }
 
-func (s *Service) WeekStats(ctx context.Context, userID string) (*WeekSummary, error) {
+func (s *Service) WeekStats(ctx context.Context, userID string, weeksBack int) (*WeekSummary, error) {
 	store := repository.NewStore(s.pool)
-	from := s.today().AddDate(0, 0, -6)
-	rows, err := store.Stats.StatsRange(ctx, userID, dayKey(from), dayKey(s.today()))
+	to := s.today().AddDate(0, 0, -7*weeksBack)
+	from := to.AddDate(0, 0, -6)
+	rows, err := store.Stats.StatsRange(ctx, userID, dayKey(from), dayKey(to))
 	if err != nil {
 		return nil, err
 	}
@@ -929,18 +976,19 @@ func toSummary(s *entity.DailyStats) *DailySummary {
 	}
 }
 
-func (s *Service) Analytics(ctx context.Context, userID string) (*Analytics, error) {
+func (s *Service) Analytics(ctx context.Context, userID string, weeksBack int) (*Analytics, error) {
 	store := repository.NewStore(s.pool)
-	week, err := s.WeekStats(ctx, userID)
+	week, err := s.WeekStats(ctx, userID, weeksBack)
 	if err != nil {
 		return nil, err
 	}
-	from := s.today().AddDate(0, 0, -6)
-	categories, err := store.Stats.HabitXPByCategory(ctx, userID, dayKey(from))
+	to := s.today().AddDate(0, 0, -7*weeksBack)
+	from := to.AddDate(0, 0, -6)
+	categories, err := store.Stats.HabitXPByCategory(ctx, userID, dayKey(from), dayKey(to))
 	if err != nil {
 		return nil, err
 	}
-	taskXP, err := store.Stats.TaskXPInRange(ctx, userID, dayKey(from))
+	taskXP, err := store.Stats.TaskXPInRange(ctx, userID, dayKey(from), dayKey(to))
 	if err != nil {
 		return nil, err
 	}

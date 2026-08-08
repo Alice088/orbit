@@ -4,6 +4,7 @@ import { Flame, Plus, Repeat, Trash2, CheckCircle2 } from "lucide-react"
 import { api, ApiError } from "@/lib/api"
 import { plural } from "@/lib/format"
 import { achievementTitle } from "@/lib/labels"
+import { nextMilestoneInfo } from "@/lib/milestones"
 import { PageHeader, EmptyState } from "@/components/shared/page-header"
 import { StatusBadge } from "@/components/shared/status-badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -19,7 +20,6 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Award } from "lucide-react"
@@ -62,7 +62,7 @@ function untilMidnight(now: number): number {
 interface MilestoneRow {
   days: string
   bonus: string
-  achievement: string
+  title: string
 }
 
 function HabitCreateDialog() {
@@ -71,27 +71,26 @@ function HabitCreateDialog() {
   const [title, setTitle] = useState("")
   const [baseXP, setBaseXP] = useState("5")
   const [category, setCategory] = useState("")
-  const [tracking, setTracking] = useState(true)
   const [rows, setRows] = useState<MilestoneRow[]>([
-    { days: "7", bonus: "5", achievement: "" },
+    { days: "7", bonus: "5", title: "" },
   ])
   const [error, setError] = useState("")
 
   const mutation = useMutation({
-    mutationFn: () =>
-      api.habits.create({
+    mutationFn: () => {
+      const list = rows.filter((r) => r.days !== "" || r.bonus !== "")
+      return api.habits.create({
         title,
         base_xp: Number(baseXP),
-        streak_tracking: tracking,
+        streak_tracking: true,
         category,
-        milestones: rows
-          .filter((r) => r.days !== "" || r.bonus !== "")
-          .map((r) => ({
-            days: Number(r.days),
-            bonus_xp: Number(r.bonus),
-            ...(r.achievement.trim() ? { achievement_code: r.achievement.trim() } : {}),
-          })),
-      }),
+        milestones: list.map((r) => ({
+          days: Number(r.days),
+          bonus_xp: Number(r.bonus),
+          achievement_code: r.title.trim(),
+        })),
+      })
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["habits"] })
       setOpen(false)
@@ -111,6 +110,10 @@ function HabitCreateDialog() {
       .map((r) => ({ days: Number(r.days), bonus: Number(r.bonus) }))
     if (!title.trim() || base <= 0) {
       setError("Заполни название и базовый XP")
+      return
+    }
+    if (rows.filter((r) => r.days !== "" || r.bonus !== "").some((r) => !r.title.trim())) {
+      setError("У каждой вехи укажи название достижения")
       return
     }
     if (parsed.some((r) => !Number.isFinite(r.days) || !Number.isFinite(r.bonus) || r.days <= 0 || r.bonus <= 0)) {
@@ -177,56 +180,53 @@ function HabitCreateDialog() {
               />
             </div>
           </div>
-          <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
-            <div>
-              <p className="text-sm font-medium">Отслеживать серию</p>
-              <p className="text-xs text-muted-foreground">
-                Пропуск два дня подряд сбрасывает серию и даёт штраф
+          <div className="flex flex-col gap-2">
+            <Label>Вехи серии</Label>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Веха сработает один раз, когда серия достигнет N дней подряд: начислится бонус к XP и откроется достижение с названием, которое ты укажешь. После прохождения вех порог и награда каждой умножаются на 1.5 (с округлением вверх), а достижения идут по уровням: «Название урв.2», «урв.3» и так далее.
               </p>
-            </div>
-            <Switch checked={tracking} onCheckedChange={setTracking} />
-          </div>
-          {tracking && (
-            <div className="flex flex-col gap-2">
-              <Label>Вехи серии</Label>
               <div className="flex flex-col gap-2">
                 {rows.map((row, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex flex-col gap-2 rounded-md border px-2 py-2">
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={row.days}
+                        onChange={(e) => setRow(i, "days", e.target.value)}
+                        className="w-16"
+                        placeholder="7"
+                        aria-label="Дней в серии"
+                      />
+                      <span className="whitespace-nowrap text-sm text-muted-foreground">дней подряд →</span>
+                      <span className="text-sm text-muted-foreground">+</span>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={row.bonus}
+                        onChange={(e) => setRow(i, "bonus", e.target.value)}
+                        className="w-16"
+                        placeholder="5"
+                        aria-label="Бонус XP"
+                      />
+                      <span className="whitespace-nowrap text-sm text-muted-foreground">XP</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="ml-auto"
+                        onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
+                        aria-label="Удалить веху"
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                     <Input
-                      type="number"
-                      min={1}
-                      value={row.days}
-                      onChange={(e) => setRow(i, "days", e.target.value)}
-                      className="w-20"
-                      placeholder="дни"
-                      aria-label="Дней в серии"
+                      value={row.title}
+                      onChange={(e) => setRow(i, "title", e.target.value)}
+                      placeholder="название достижения"
+                      aria-label="Название достижения"
                     />
-                    <span className="text-sm text-muted-foreground">дн →</span>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={row.bonus}
-                      onChange={(e) => setRow(i, "bonus", e.target.value)}
-                      className="w-20"
-                      placeholder="XP"
-                      aria-label="Бонус XP"
-                    />
-                    <Input
-                      value={row.achievement}
-                      onChange={(e) => setRow(i, "achievement", e.target.value)}
-                      className="flex-1"
-                      placeholder="ачивка (необязательно)"
-                      aria-label="Код достижения"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}
-                      aria-label="Удалить веху"
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
                   </div>
                 ))}
               </div>
@@ -234,13 +234,12 @@ function HabitCreateDialog() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setRows((prev) => [...prev, { days: "", bonus: "", achievement: "" }])}
+                onClick={() => setRows((prev) => [...prev, { days: "", bonus: "", title: "" }])}
               >
                 <Plus className="size-4" />
                 Добавить веху
               </Button>
             </div>
-          )}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={mutation.isPending}>
@@ -330,7 +329,7 @@ export default function HabitsPage() {
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {habits.data.map((h) => {
             const s = streakByHabit.get(h.id)
-            const next = [...(h.milestones ?? [])].sort((a, b) => a.days - b.days).find((m) => m.days > (s?.current_days ?? 0))
+            const next = nextMilestoneInfo(h, s?.current_days ?? 0)
             const done = pendingDone.has(h.id)
               ? true
               : h.last_completed_at
@@ -362,11 +361,10 @@ export default function HabitsPage() {
                       </div>
                       {next ? (
                         <span className="text-xs text-muted-foreground">
-                          до вехи {next.days} дн: +{next.bonus_xp} XP
-                          {next.achievement_code ? ` · ${achievementTitle(next.achievement_code)}` : ""}
+                          до вехи {next.days} дн: +{next.bonus_xp} XP · {next.title}
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">все вехи пройдены</span>
+                        <span className="text-xs text-muted-foreground">без вех</span>
                       )}
                     </div>
                   ) : (

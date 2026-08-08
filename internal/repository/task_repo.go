@@ -60,10 +60,16 @@ func (r *TaskRepo) DeleteByGoal(ctx context.Context, goalID string) error {
 	return err
 }
 
-func (r *TaskRepo) ListByUser(ctx context.Context, userID string) ([]entity.Task, error) {
+func (r *TaskRepo) ListByUser(ctx context.Context, userID string, status string, limit, offset int) ([]entity.Task, error) {
+	limitClause := ""
+	args := []any{userID, status}
+	if limit > 0 {
+		limitClause = " LIMIT $3 OFFSET $4"
+		args = append(args, limit, offset)
+	}
 	rows, err := r.q.Query(ctx,
 		`SELECT id, user_id, goal_id, milestone_from_id, milestone_to_id, title, contribution_coef, difficulty, status, created_at, completed_at, gpp_reward
-		 FROM tasks WHERE user_id = $1 ORDER BY created_at DESC`, userID)
+		 FROM tasks WHERE user_id = $1 AND ($2 = '' OR status = $2) ORDER BY created_at DESC`+limitClause, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -80,4 +86,11 @@ func (r *TaskRepo) ListByUser(ctx context.Context, userID string) ([]entity.Task
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+func (r *TaskRepo) Count(ctx context.Context, userID string, status string) (int, error) {
+	var n int
+	err := r.q.QueryRow(ctx,
+		`SELECT count(*) FROM tasks WHERE user_id = $1 AND ($2 = '' OR status = $2)`, userID, status).Scan(&n)
+	return n, err
 }

@@ -42,13 +42,13 @@ func (r *LedgerRepo) SumXP(ctx context.Context, userID string) (int, error) {
 	return sum, err
 }
 
-func (r *LedgerRepo) ListRecent(ctx context.Context, userID string, limit int) ([]TransactionRow, error) {
+func (r *LedgerRepo) ListRecent(ctx context.Context, userID string, limit, offset int) ([]TransactionRow, error) {
 	rows, err := r.q.Query(ctx,
 		`SELECT pt.id, pt.currency, pt.amount, pt.reason, pt.goal_id, pt.domain_event_id, pt.created_at, COALESCE(g.title, '')
 		 FROM point_transactions pt
 		 LEFT JOIN goals g ON pt.goal_id = g.id
 		 WHERE pt.user_id = $1
-		 ORDER BY pt.created_at DESC LIMIT $2`, userID, limit)
+		 ORDER BY pt.created_at DESC LIMIT $2 OFFSET $3`, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -62,6 +62,12 @@ func (r *LedgerRepo) ListRecent(ctx context.Context, userID string, limit int) (
 		out = append(out, t)
 	}
 	return out, rows.Err()
+}
+
+func (r *LedgerRepo) Count(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := r.q.QueryRow(ctx, `SELECT count(*) FROM point_transactions WHERE user_id = $1`, userID).Scan(&n)
+	return n, err
 }
 
 func (r *LedgerRepo) ByEvent(ctx context.Context, eventID string) ([]entity.PointTransaction, error) {

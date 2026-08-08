@@ -43,29 +43,24 @@ export const eventLabel: Record<string, string> = {
   goal_reviewed: "Цель пересмотрена",
   goal_deleted: "Цель удалена",
   manual_checkin: "Чекин",
+  manual_penalty: "Штраф",
   daily_settlement: "Ежедневный расчёт",
   inactivity_penalty: "Штраф за неактивность",
   achievement_unlocked: "Достижение открыто",
   streak_advanced: "Серия продлена",
 }
 
+export const ACHIEVEMENTS: { code: string; title: string }[] = [
+  { code: "reading_7", title: "Неделя чтения" },
+  { code: "reading_30", title: "Месяц чтения" },
+  { code: "reading_100", title: "100 дней чтения" },
+  { code: "workout_7", title: "Неделя тренировок" },
+  { code: "workout_30", title: "Месяц тренировок" },
+  { code: "workout_100", title: "100 дней тренировок" },
+]
+
 export function achievementTitle(code: string): string {
-  switch (code) {
-    case "workout_7":
-      return "Неделя тренировок"
-    case "workout_30":
-      return "Месяц тренировок"
-    case "workout_100":
-      return "100 дней тренировок"
-    case "reading_7":
-      return "Неделя чтения"
-    case "reading_30":
-      return "Месяц чтения"
-    case "reading_100":
-      return "100 дней чтения"
-    default:
-      return code
-  }
+  return ACHIEVEMENTS.find((a) => a.code === code)?.title ?? code
 }
 
 export function eventDescription(event: {

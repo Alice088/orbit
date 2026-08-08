@@ -40,8 +40,8 @@ export default function GoalDetailPage() {
   })
   const tasks = useQuery({
     queryKey: ["tasks"],
-    queryFn: api.tasks.list,
-    select: (all) => (goalId ? all.filter((t) => t.goal_id === goalId) : all),
+    queryFn: () => api.tasks.list(),
+    select: (page) => (goalId ? page.items.filter((t) => t.goal_id === goalId) : page.items),
   })
 
   const review = useMutation({

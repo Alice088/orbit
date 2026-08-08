@@ -21,13 +21,11 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
 interface MilestoneRow {
   percent: string
-  reward: string
 }
 
 function autoReward(percent: number, total: number): number {
@@ -39,17 +37,16 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [total, setTotal] = useState("1000")
-  const [autoCalc, setAutoCalc] = useState(true)
   const [rows, setRows] = useState<MilestoneRow[]>([
-    { percent: "0", reward: "0" },
-    { percent: "10", reward: "100" },
-    { percent: "20", reward: "200" },
-    { percent: "100", reward: "1000" },
+    { percent: "0" },
+    { percent: "10" },
+    { percent: "20" },
+    { percent: "100" },
   ])
   const [error, setError] = useState("")
 
   const totalNum = Number(total) || 0
-  const rewardFor = (percent: number) => (autoCalc ? autoReward(percent, totalNum) : 0)
+  const rewardFor = (percent: number) => autoReward(percent, totalNum)
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -58,7 +55,7 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
         total_gpp: totalNum,
         milestones: rows.map((r) => ({
           percent: Number(r.percent),
-          reward_points: autoCalc ? autoReward(Number(r.percent), totalNum) : Number(r.reward),
+          reward_points: autoReward(Number(r.percent), totalNum),
         })),
       }),
     onSuccess: () => {
@@ -77,7 +74,7 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
     setError("")
     const parsed = rows.map((r) => ({
       percent: Number(r.percent),
-      reward: autoCalc ? autoReward(Number(r.percent), totalNum) : Number(r.reward),
+      reward: autoReward(Number(r.percent), totalNum),
     }))
     if (!title.trim() || totalNum <= 0) {
       setError("Заполни название и общий объём цели")
@@ -105,7 +102,7 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
         return
       }
       if (sorted[i].reward <= sorted[i - 1].reward) {
-        setError(autoCalc ? "Слишком малый объём — награды вех совпадают. Увеличь GPP." : "Награды вех должны возрастать")
+        setError("Слишком малый объём — награды вех совпадают. Увеличь GPP.")
         return
       }
     }
@@ -151,17 +148,11 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
               onChange={(e) => setTotal(e.target.value)}
             />
           </div>
-          <div className="flex items-center justify-between rounded-md border px-3 py-2.5">
-            <div>
-              <p className="text-sm font-medium">Авто-расчёт наград</p>
-              <p className="text-xs text-muted-foreground">
-                Награда вехи = процент × объём цели
-              </p>
-            </div>
-            <Switch checked={autoCalc} onCheckedChange={setAutoCalc} />
-          </div>
           <div className="flex flex-col gap-2">
             <Label>Вехи</Label>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Награда вехи = процент × объём цели, считается автоматически.
+            </p>
             <div className="flex flex-col gap-2">
               {rows.map((row, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -178,9 +169,8 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
                   <Input
                     type="number"
                     min={0}
-                    value={autoCalc ? String(rewardFor(Number(row.percent))) : row.reward}
-                    disabled={autoCalc}
-                    onChange={(e) => setRow(i, "reward", e.target.value)}
+                    value={String(rewardFor(Number(row.percent)))}
+                    disabled
                     className="flex-1"
                     aria-label="Награда вехи"
                   />
@@ -201,7 +191,7 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setRows((prev) => [...prev, { percent: "", reward: "" }])}
+              onClick={() => setRows((prev) => [...prev, { percent: "" }])}
             >
               <Plus className="size-4" />
               Добавить веху

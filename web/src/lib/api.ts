@@ -171,6 +171,11 @@ export interface ActivityEvent {
   occurred_at: string
 }
 
+export interface Page<T> {
+  items: T[]
+  total: number
+}
+
 export interface Completion {
   gpp: number
   xp: number
@@ -198,7 +203,10 @@ export const api = {
   },
 
   tasks: {
-    list: () => get<Task[]>("/v1/tasks"),
+    list: (status?: string, limit?: number, offset?: number) =>
+      get<Page<Task>>(
+        `/v1/tasks?status=${status ?? ""}&limit=${limit ?? 0}&offset=${offset ?? 0}`,
+      ),
     create: (body: {
       goal_id: string
       title: string
@@ -224,13 +232,15 @@ export const api = {
 
   stats: {
     today: () => get<DailyStats>("/v1/stats/today"),
-    week: () => get<WeekStats>("/v1/stats/week"),
+    week: (weeksBack = 0) => get<WeekStats>(`/v1/stats/week?weeks=${weeksBack}`),
     level: () => get<LevelInfo>("/v1/levels/current"),
     streaks: () => get<Streak[]>("/v1/streaks"),
     achievements: () => get<Achievement[]>("/v1/achievements"),
-    analytics: () => get<Analytics>("/v1/analytics/overview"),
-    activity: () => get<ActivityEvent[]>("/v1/activity"),
-    transactions: () => get<Transaction[]>("/v1/transactions"),
+    analytics: (weeksBack = 0) => get<Analytics>(`/v1/analytics/overview?weeks=${weeksBack}`),
+    activity: (limit: number, offset: number) =>
+      get<Page<ActivityEvent>>(`/v1/activity?limit=${limit}&offset=${offset}`),
+    transactions: (limit: number, offset: number) =>
+      get<Page<Transaction>>(`/v1/transactions?limit=${limit}&offset=${offset}`),
     checkin: (mood: string) => post<void>("/v1/checkin", { mood }),
   },
 

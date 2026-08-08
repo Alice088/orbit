@@ -104,6 +104,24 @@ func (r *HabitRepo) SetLastCompleted(ctx context.Context, id string, t time.Time
 	return err
 }
 
+func (r *HabitRepo) MaxMilestoneLevel(ctx context.Context, userID string, habitID string, milestoneIdx int) (int, error) {
+	var level int
+	err := r.q.QueryRow(ctx,
+		`SELECT COALESCE(MAX(level), 0) FROM habit_milestone_clears
+		 WHERE user_id = $1 AND habit_id = $2 AND milestone_idx = $3`, userID, habitID, milestoneIdx).Scan(&level)
+	return level, err
+}
+
+func (r *HabitRepo) InsertMilestoneClear(ctx context.Context, userID string, habitID string, milestoneIdx int, level int, bonusXP int) (bool, error) {
+	tag, err := r.q.Exec(ctx,
+		`INSERT INTO habit_milestone_clears (user_id, habit_id, milestone_idx, level, bonus_xp)
+		 VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`, userID, habitID, milestoneIdx, level, bonusXP)
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
 func (r *HabitRepo) Delete(ctx context.Context, id string) error {
 	_, err := r.q.Exec(ctx, `DELETE FROM habits WHERE id = $1`, id)
 	return err

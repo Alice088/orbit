@@ -1,11 +1,13 @@
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ArrowRight, Flame, ListChecks, Sparkles, Target, TrendingUp } from "lucide-react"
 import { Link } from "react-router-dom"
 import { api } from "@/lib/api"
-import { formatNumber, formatShortDate, greeting } from "@/lib/format"
+import { formatNumber, formatShortDate, greeting, weekRangeLabel } from "@/lib/format"
 import { MetricCard } from "@/components/shared/metric-card"
 import { ProgressBar } from "@/components/shared/progress-bar"
 import { ActivityItem } from "@/components/shared/activity-item"
+import { WeekNav } from "@/components/shared/week-nav"
 import { EmptyState } from "@/components/shared/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,11 +21,19 @@ import { Line, LineChart, XAxis, YAxis } from "recharts"
 import { goalStatusLabel } from "@/lib/labels"
 
 export default function DashboardPage() {
+  const [weeksBack, setWeeksBack] = useState(0)
   const today = useQuery({ queryKey: ["stats", "today"], queryFn: api.stats.today })
-  const week = useQuery({ queryKey: ["stats", "week"], queryFn: api.stats.week })
+  const week = useQuery({
+    queryKey: ["stats", "week", weeksBack],
+    queryFn: () => api.stats.week(weeksBack),
+  })
   const level = useQuery({ queryKey: ["level"], queryFn: api.stats.level })
   const goals = useQuery({ queryKey: ["goals"], queryFn: api.goals.list })
-  const activity = useQuery({ queryKey: ["activity"], queryFn: api.stats.activity })
+  const activity = useQuery({
+    queryKey: ["activity"],
+    queryFn: () => api.stats.activity(5, 0),
+    refetchInterval: 60_000,
+  })
 
   const goalsWithProgress = useQuery({
     queryKey: ["goals", "progress"],
@@ -79,8 +89,13 @@ export default function DashboardPage() {
       </div>
 
       <Card className="shadow-none">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-semibold">XP за последние 7 дней</CardTitle>
+          <WeekNav
+            weeksBack={weeksBack}
+            label={weekRangeLabel(week.data?.days, weeksBack)}
+            onChange={setWeeksBack}
+          />
         </CardHeader>
         <CardContent>
           {week.isLoading ? (
@@ -187,17 +202,17 @@ export default function DashboardPage() {
           <CardContent>
             {activity.isLoading ? (
               <Skeleton className="h-24 w-full" />
-            ) : !activity.data || activity.data.length === 0 ? (
+            ) : !activity.data || activity.data.items.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 Пока нет активности
               </p>
             ) : (
               <div className="flex flex-col">
-                {activity.data.slice(0, 5).map((e, i) => (
+                {activity.data.items.slice(0, 5).map((e, i) => (
                   <ActivityItem
                     key={e.id}
                     event={e}
-                    last={i === Math.min(5, activity.data.length) - 1}
+                    last={i === Math.min(5, activity.data.items.length) - 1}
                   />
                 ))}
               </div>

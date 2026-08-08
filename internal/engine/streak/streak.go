@@ -79,3 +79,11 @@ func MilestoneBonus(milestones []Milestone, currentDays int) (int, bool) {
 	}
 	return 0, false
 }
+
+func ScaledThreshold(base, level int) int {
+	t := base
+	for l := 2; l <= level; l++ {
+		t = (t*3 + 1) / 2
+	}
+	return t
+}

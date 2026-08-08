@@ -1,9 +1,11 @@
+import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Coins, Sparkles, Target, TrendingDown, TrendingUp } from "lucide-react"
+import { Coins, Sparkles, Target, TrendingUp } from "lucide-react"
 import { api, type Transaction } from "@/lib/api"
 import { formatNumber, formatDateTime } from "@/lib/format"
 import { reasonLabel, currencyLabel } from "@/lib/labels"
 import { PageHeader } from "@/components/shared/page-header"
+import { Pagination } from "@/components/shared/pagination"
 import { MetricCard } from "@/components/shared/metric-card"
 import { PenaltyDialog } from "@/components/dialogs/penalty-dialog"
 import { Card, CardContent } from "@/components/ui/card"
@@ -43,10 +45,15 @@ function CurrencyPill({ currency }: { currency: string }) {
 }
 
 export default function PointsPage() {
+  const [page, setPage] = useState(1)
+  const limit = 20
   const level = useQuery({ queryKey: ["level"], queryFn: api.stats.level })
-  const week = useQuery({ queryKey: ["stats", "week"], queryFn: api.stats.week })
+  const week = useQuery({ queryKey: ["stats", "week"], queryFn: () => api.stats.week() })
   const today = useQuery({ queryKey: ["stats", "today"], queryFn: api.stats.today })
-  const txs = useQuery({ queryKey: ["transactions"], queryFn: api.stats.transactions })
+  const txs = useQuery({
+    queryKey: ["transactions", page],
+    queryFn: () => api.stats.transactions(limit, (page - 1) * limit),
+  })
 
   const lastWeekXP = week.data?.total_xp ?? 0
   const trend =
@@ -100,7 +107,7 @@ export default function PointsPage() {
             <div className="p-4">
               <Skeleton className="h-48 w-full" />
             </div>
-          ) : !txs.data || txs.data.length === 0 ? (
+          ) : !txs.data || txs.data.items.length === 0 ? (
             <p className="py-12 text-center text-sm text-muted-foreground">
               Транзакций пока нет
             </p>
@@ -116,7 +123,7 @@ export default function PointsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {txs.data.map((t: Transaction) => (
+                {txs.data.items.map((t: Transaction) => (
                   <TableRow key={t.id}>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                       {formatDateTime(t.created_at)}
@@ -138,15 +145,8 @@ export default function PointsPage() {
           )}
         </CardContent>
       </Card>
-      {txs.data && txs.data.length > 0 && (
-        <p className="flex items-center gap-1 text-xs text-muted-foreground">
-          {trend?.up ? (
-            <TrendingUp className="size-3.5" />
-          ) : (
-            <TrendingDown className="size-3.5" />
-          )}
-          Показаны последние {txs.data.length} транзакций
-        </p>
+      {txs.data && txs.data.total > 0 && (
+        <Pagination page={page} total={txs.data.total} limit={limit} onChange={setPage} />
       )}
     </div>
   )

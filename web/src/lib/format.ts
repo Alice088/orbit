@@ -20,6 +20,13 @@ export function formatShortDate(iso: string): string {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })
 }
 
+export function weekRangeLabel(days: { day: string }[] | undefined, weeksBack: number): string {
+  if (days && days.length > 0) {
+    return `${formatShortDate(days[0].day)} – ${formatShortDate(days[days.length - 1].day)}`
+  }
+  return weeksBack === 0 ? "эта неделя" : `−${weeksBack} нед`
+}
+
 export function formatDateTime(iso: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return iso

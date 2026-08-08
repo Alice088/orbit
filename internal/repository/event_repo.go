@@ -48,10 +48,10 @@ func (r *EventRepo) ActivityOnDay(ctx context.Context, userID string, eventTypes
 	return n > 0, err
 }
 
-func (r *EventRepo) ListRecent(ctx context.Context, userID string, limit int) ([]entity.DomainEvent, error) {
+func (r *EventRepo) ListRecent(ctx context.Context, userID string, limit, offset int) ([]entity.DomainEvent, error) {
 	rows, err := r.q.Query(ctx,
 		`SELECT id, event_type, aggregate_type, aggregate_id, payload, occurred_at
-		 FROM domain_events WHERE user_id = $1 ORDER BY occurred_at DESC LIMIT $2`, userID, limit)
+		 FROM domain_events WHERE user_id = $1 ORDER BY occurred_at DESC LIMIT $2 OFFSET $3`, userID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +71,12 @@ func (r *EventRepo) ListRecent(ctx context.Context, userID string, limit int) ([
 		out = append(out, e)
 	}
 	return out, rows.Err()
+}
+
+func (r *EventRepo) Count(ctx context.Context, userID string) (int, error) {
+	var n int
+	err := r.q.QueryRow(ctx, `SELECT count(*) FROM domain_events WHERE user_id = $1`, userID).Scan(&n)
+	return n, err
 }
 
 func (r *EventRepo) ListByAggregate(ctx context.Context, userID string, aggregateType string, aggregateID string) ([]entity.DomainEvent, error) {

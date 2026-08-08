@@ -80,3 +80,26 @@ func TestMilestoneBonus(t *testing.T) {
 		t.Fatalf("MilestoneBonus(8) = %d,%v, want 0,false", got, ok)
 	}
 }
+
+func TestScaledThreshold(t *testing.T) {
+	cases := []struct {
+		base  int
+		level int
+		want  int
+	}{
+		{3, 1, 3},
+		{3, 2, 5},
+		{3, 3, 8},
+		{3, 4, 12},
+		{3, 5, 18},
+		{7, 2, 11},
+		{30, 2, 45},
+		{1, 2, 2},
+		{14, 3, 32},
+	}
+	for _, c := range cases {
+		if got := ScaledThreshold(c.base, c.level); got != c.want {
+			t.Fatalf("ScaledThreshold(%d,%d) = %d, want %d", c.base, c.level, got, c.want)
+		}
+	}
+}

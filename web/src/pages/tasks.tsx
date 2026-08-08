@@ -12,15 +12,20 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TaskCreateDialog } from "@/components/dialogs/task-create-dialog"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
+import { Pagination } from "@/components/shared/pagination"
 import { toast } from "sonner"
 
 type Filter = "all" | "open" | "completed"
 
 export default function TasksPage() {
   const [filter, setFilter] = useState<Filter>("all")
+  const [page, setPage] = useState(1)
   const queryClient = useQueryClient()
 
-  const tasks = useQuery({ queryKey: ["tasks"], queryFn: api.tasks.list })
+  const tasks = useQuery({
+    queryKey: ["tasks", filter, page],
+    queryFn: () => api.tasks.list(filter, 20, (page - 1) * 20),
+  })
   const goals = useQuery({ queryKey: ["goals"], queryFn: api.goals.list })
   const goalTitle = new Map((goals.data ?? []).map((g) => [g.id, g.title]))
 
@@ -50,7 +55,7 @@ export default function TasksPage() {
     onError: (err) => toast.error(err.message),
   })
 
-  const shown = (tasks.data ?? []).filter((t) => {
+  const shown = (tasks.data?.items ?? []).filter((t) => {
     if (filter === "open") return t.status === "open"
     if (filter === "completed") return t.status === "completed"
     return true
@@ -63,7 +68,14 @@ export default function TasksPage() {
         description="Стратегические шаги внутри целей. Выполнение даёт GPP и XP."
         actions={<TaskCreateDialog />}
       />
-      <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)} className="mb-4">
+      <Tabs
+        value={filter}
+        onValueChange={(v) => {
+          setFilter(v as Filter)
+          setPage(1)
+        }}
+        className="mb-4"
+      >
         <TabsList>
           <TabsTrigger value="all">Все</TabsTrigger>
           <TabsTrigger value="open">Открытые</TabsTrigger>
@@ -80,7 +92,7 @@ export default function TasksPage() {
           icon={ListChecks}
           title="Задач нет"
           description={
-            tasks.data && tasks.data.length === 0
+            tasks.data && tasks.data.total === 0
               ? "Создай задачу внутри цели — она переведёт цель к следующей вехе."
               : "В этом разделе пока пусто."
           }
@@ -141,6 +153,11 @@ export default function TasksPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      )}
+      {tasks.data && tasks.data.total > 20 && (
+        <div className="mt-4">
+          <Pagination page={page} total={tasks.data.total} limit={20} onChange={setPage} />
         </div>
       )}
     </div>

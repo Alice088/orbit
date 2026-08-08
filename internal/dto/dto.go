@@ -179,3 +179,18 @@ type ActivityResponse struct {
 	Payload       map[string]any `json:"payload"`
 	OccurredAt    string         `json:"occurred_at"`
 }
+
+type ActivityPageResponse struct {
+	Items []ActivityResponse `json:"items"`
+	Total int                `json:"total"`
+}
+
+type TransactionPageResponse struct {
+	Items []TransactionResponse `json:"items"`
+	Total int                   `json:"total"`
+}
+
+type TaskPageResponse struct {
+	Items []TaskResponse `json:"items"`
+	Total int            `json:"total"`
+}
