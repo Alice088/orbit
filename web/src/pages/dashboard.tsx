@@ -14,10 +14,12 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
-import { Line, LineChart, XAxis, YAxis } from "recharts"
+import { Area, AreaChart, XAxis, YAxis } from "recharts"
 import { goalStatusLabel } from "@/lib/labels"
 
 export default function DashboardPage() {
@@ -47,6 +49,7 @@ export default function DashboardPage() {
   const chartData = (week.data?.days ?? []).map((d) => ({
     day: formatShortDate(d.day),
     xp: d.xp_earned,
+    gpp: d.gpp_earned,
   }))
 
   const doneToday =
@@ -90,7 +93,7 @@ export default function DashboardPage() {
 
       <Card className="shadow-none">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-sm font-semibold">XP за последние 7 дней</CardTitle>
+          <CardTitle className="text-sm font-semibold">XP и GPP за неделю</CardTitle>
           <WeekNav
             weeksBack={weeksBack}
             label={weekRangeLabel(week.data?.days, weeksBack)}
@@ -100,17 +103,30 @@ export default function DashboardPage() {
         <CardContent>
           {week.isLoading ? (
             <Skeleton className="h-48 w-full" />
-          ) : chartData.every((d) => d.xp === 0) ? (
+          ) : chartData.every((d) => d.xp === 0 && d.gpp === 0) ? (
             <div className="flex h-48 flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
               <TrendingUp className="size-5" />
               <p>Пока нет данных за неделю</p>
             </div>
           ) : (
             <ChartContainer
-              config={{ xp: { label: "XP", color: "hsl(var(--foreground))" } }}
+              config={{
+                xp: { label: "XP", color: "hsl(var(--foreground))" },
+                gpp: { label: "GPP", color: "hsl(160 84% 39%)" },
+              }}
               className="h-48 w-full"
             >
-              <LineChart data={chartData} margin={{ left: -20, right: 4, top: 4, bottom: 0 }}>
+              <AreaChart data={chartData} margin={{ left: -20, right: 4, top: 4, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="fillXp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(var(--foreground))" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="hsl(var(--foreground))" stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="fillGpp" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsl(160 84% 39%)" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="hsl(160 84% 39%)" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
                 <XAxis
                   dataKey="day"
                   tickLine={false}
@@ -125,15 +141,26 @@ export default function DashboardPage() {
                   allowDecimals={false}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Line
+                <ChartLegend content={<ChartLegendContent />} />
+                <Area
                   type="monotone"
                   dataKey="xp"
                   stroke="hsl(var(--foreground))"
                   strokeWidth={1.5}
+                  fill="url(#fillXp)"
                   dot={{ r: 2.5, fill: "hsl(var(--foreground))" }}
                   activeDot={{ r: 4 }}
                 />
-              </LineChart>
+                <Area
+                  type="monotone"
+                  dataKey="gpp"
+                  stroke="hsl(160 84% 39%)"
+                  strokeWidth={1.5}
+                  fill="url(#fillGpp)"
+                  dot={{ r: 2.5, fill: "hsl(160 84% 39%)" }}
+                  activeDot={{ r: 4 }}
+                />
+              </AreaChart>
             </ChartContainer>
           )}
         </CardContent>
