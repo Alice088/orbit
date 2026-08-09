@@ -95,6 +95,7 @@ const ru = {
     emptyDesc: "Создай первую цель — разбей путь на вехи и начни накапливать GPP.",
     emptyCompletedTitle: "Завершённых целей пока нет",
     emptyCompletedDesc: "Когда цель достигнет 100%, она появится здесь.",
+    graphTab: "Граф",
   },
   goalDetail: {
     backToGoals: "Все цели",

@@ -93,6 +93,7 @@ const en = {
     emptyDesc: "Create your first goal — split the path into milestones and start earning GPP.",
     emptyCompletedTitle: "No completed goals yet",
     emptyCompletedDesc: "When a goal reaches 100%, it appears here.",
+    graphTab: "Graph",
   },
   goalDetail: {
     backToGoals: "All goals",

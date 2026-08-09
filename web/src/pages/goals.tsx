@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { lazy, Suspense, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ArrowRight, Plus, Target } from "lucide-react"
 import { Link } from "react-router-dom"
@@ -32,6 +32,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { toast } from "sonner"
+
+const GoalGraph = lazy(() => import("@/components/goal-graph"))
 
 function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
   const queryClient = useQueryClient()
@@ -229,6 +231,7 @@ export default function GoalsPage() {
         <TabsList>
           <TabsTrigger value="active">{t("goals.activeTab")}</TabsTrigger>
           <TabsTrigger value="completed">{t("goals.completedTab")}</TabsTrigger>
+          <TabsTrigger value="graph">{t("goals.graphTab")}</TabsTrigger>
         </TabsList>
         <TabsContent value="active" className="mt-4">
           {goals.isLoading ? (
@@ -261,6 +264,25 @@ export default function GoalsPage() {
             />
           ) : (
             <GoalList items={completedGoals} progress={progress.data} byId={byId} />
+          )}
+        </TabsContent>
+        <TabsContent value="graph" className="mt-4">
+          {goals.isLoading ? (
+            <Skeleton className="h-[60vh] w-full" />
+          ) : (goals.data ?? []).length === 0 ? (
+            <EmptyState
+              icon={Target}
+              title={t("goals.emptyTitle")}
+              description={t("goals.emptyDesc")}
+            />
+          ) : (
+            <Suspense
+              fallback={
+                <div className="flex h-[60vh] w-full items-center justify-center rounded-lg border bg-background" />
+              }
+            >
+              <GoalGraph goals={goals.data ?? []} />
+            </Suspense>
           )}
         </TabsContent>
       </Tabs>
