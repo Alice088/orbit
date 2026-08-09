@@ -36,6 +36,7 @@ func NewRouter(healthHandler *handler.HealthHandler, handlers *handler.Handlers,
 				r.Post("/", handlers.Goals.Create)
 				r.Get("/", handlers.Goals.List)
 				r.Get("/{goalID}", handlers.Goals.Detail)
+				r.Patch("/{goalID}", handlers.Goals.SetParent)
 				r.Get("/{goalID}/progress", handlers.Goals.Progress)
 				r.Post("/{goalID}/review", handlers.Goals.Review)
 				r.Delete("/{goalID}", handlers.Goals.Delete)

@@ -11,13 +11,14 @@ const (
 )
 
 type Goal struct {
-	ID          string
-	UserID      string
-	Title       string
-	TotalGPP    int
-	Status      GoalStatus
-	CreatedAt   time.Time
-	CompletedAt *time.Time
+	ID           string
+	UserID       string
+	Title        string
+	TotalGPP     int
+	Status       GoalStatus
+	ParentGoalID *string
+	CreatedAt    time.Time
+	CompletedAt  *time.Time
 }
 
 type Milestone struct {

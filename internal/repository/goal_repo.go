@@ -19,9 +19,9 @@ func NewGoalRepo(q Querier) *GoalRepo {
 
 func (r *GoalRepo) Create(ctx context.Context, g *entity.Goal) error {
 	row := r.q.QueryRow(ctx,
-		`INSERT INTO goals (user_id, title, total_gpp, status)
-		 VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
-		g.UserID, g.Title, g.TotalGPP, g.Status)
+		`INSERT INTO goals (user_id, title, total_gpp, status, parent_goal_id)
+		 VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at`,
+		g.UserID, g.Title, g.TotalGPP, g.Status, nullableStringPtr(g.ParentGoalID))
 	return row.Scan(&g.ID, &g.CreatedAt)
 }
 
@@ -35,11 +35,11 @@ func (r *GoalRepo) CreateMilestone(ctx context.Context, m *entity.Milestone) err
 
 func (r *GoalRepo) GetByID(ctx context.Context, id string) (*entity.Goal, error) {
 	row := r.q.QueryRow(ctx,
-		`SELECT id, user_id, title, total_gpp, status, created_at, completed_at
+		`SELECT id, user_id, title, total_gpp, status, parent_goal_id, created_at, completed_at
 		 FROM goals WHERE id = $1`, id)
 	var g entity.Goal
 	var completedAt *time.Time
-	if err := row.Scan(&g.ID, &g.UserID, &g.Title, &g.TotalGPP, &g.Status, &g.CreatedAt, &completedAt); err != nil {
+	if err := row.Scan(&g.ID, &g.UserID, &g.Title, &g.TotalGPP, &g.Status, &g.ParentGoalID, &g.CreatedAt, &completedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -102,7 +102,7 @@ func (r *GoalRepo) MilestoneByID(ctx context.Context, id string) (*entity.Milest
 
 func (r *GoalRepo) ListByUser(ctx context.Context, userID string) ([]entity.Goal, error) {
 	rows, err := r.q.Query(ctx,
-		`SELECT id, user_id, title, total_gpp, status, created_at, completed_at
+		`SELECT id, user_id, title, total_gpp, status, parent_goal_id, created_at, completed_at
 		 FROM goals WHERE user_id = $1 ORDER BY created_at`, userID)
 	if err != nil {
 		return nil, err
@@ -112,13 +112,50 @@ func (r *GoalRepo) ListByUser(ctx context.Context, userID string) ([]entity.Goal
 	for rows.Next() {
 		var g entity.Goal
 		var completedAt *time.Time
-		if err := rows.Scan(&g.ID, &g.UserID, &g.Title, &g.TotalGPP, &g.Status, &g.CreatedAt, &completedAt); err != nil {
+		if err := rows.Scan(&g.ID, &g.UserID, &g.Title, &g.TotalGPP, &g.Status, &g.ParentGoalID, &g.CreatedAt, &completedAt); err != nil {
 			return nil, err
 		}
 		g.CompletedAt = completedAt
 		out = append(out, g)
 	}
 	return out, rows.Err()
+}
+
+func (r *GoalRepo) ParentGoalID(ctx context.Context, id string) (*string, error) {
+	var parentID *string
+	err := r.q.QueryRow(ctx,
+		`SELECT parent_goal_id FROM goals WHERE id = $1`, id).Scan(&parentID)
+	return parentID, err
+}
+
+func (r *GoalRepo) HasChildren(ctx context.Context, id string) (bool, error) {
+	var exists bool
+	err := r.q.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM goals WHERE parent_goal_id = $1)`, id).Scan(&exists)
+	return exists, err
+}
+
+func (r *GoalRepo) ChildIDs(ctx context.Context, parentID string) ([]string, error) {
+	rows, err := r.q.Query(ctx, `SELECT id FROM goals WHERE parent_goal_id = $1`, parentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+func (r *GoalRepo) SetParent(ctx context.Context, id string, parentID string) error {
+	_, err := r.q.Exec(ctx,
+		`UPDATE goals SET parent_goal_id = $2 WHERE id = $1`, id, nullableString(parentID))
+	return err
 }
 
 func (r *GoalRepo) SetStatus(ctx context.Context, id string, status entity.GoalStatus) error {

@@ -137,7 +137,7 @@ func (h *GoalHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	goal, err := h.svc.CreateGoal(r.Context(), middleware.GetUserID(r.Context()), req.Title, req.TotalGPP)
+	goal, err := h.svc.CreateGoal(r.Context(), middleware.GetUserID(r.Context()), req.Title, req.TotalGPP, req.ParentGoalID)
 	if err != nil {
 		writeError(w, statusFor(err), err.Error())
 		return
@@ -218,10 +218,26 @@ func (h *GoalHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *GoalHandler) SetParent(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	goalID := chi.URLParam(r, "goalID")
+	var req dto.UpdateGoalRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := h.svc.SetGoalParent(r.Context(), userID, goalID, req.ParentGoalID); err != nil {
+		writeError(w, statusFor(err), err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func goalToResponse(g *entity.Goal, milestones []entity.Milestone) dto.GoalResponse {
 	out := dto.GoalResponse{
 		ID: g.ID, Title: g.Title, TotalGPP: g.TotalGPP,
-		Status: string(g.Status), CreatedAt: g.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		Status: string(g.Status), ParentGoalID: g.ParentGoalID,
+		CreatedAt: g.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 	for _, m := range milestones {
 		out.Milestones = append(out.Milestones, dto.MilestoneResponse{

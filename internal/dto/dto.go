@@ -13,8 +13,13 @@ type AuthResponse struct {
 }
 
 type CreateGoalRequest struct {
-	Title    string `json:"title"`
-	TotalGPP int    `json:"total_gpp"`
+	Title        string `json:"title"`
+	TotalGPP     int    `json:"total_gpp"`
+	ParentGoalID string `json:"parent_goal_id,omitempty"`
+}
+
+type UpdateGoalRequest struct {
+	ParentGoalID string `json:"parent_goal_id"`
 }
 
 type CreateTaskRequest struct {
@@ -56,12 +61,13 @@ type MilestoneResponse struct {
 }
 
 type GoalResponse struct {
-	ID         string              `json:"id"`
-	Title      string              `json:"title"`
-	TotalGPP   int                 `json:"total_gpp"`
-	Status     string              `json:"status"`
-	CreatedAt  string              `json:"created_at"`
-	Milestones []MilestoneResponse `json:"milestones"`
+	ID           string              `json:"id"`
+	Title        string              `json:"title"`
+	TotalGPP     int                 `json:"total_gpp"`
+	Status       string              `json:"status"`
+	ParentGoalID *string             `json:"parent_goal_id,omitempty"`
+	CreatedAt    string              `json:"created_at"`
+	Milestones   []MilestoneResponse `json:"milestones"`
 }
 
 type GoalProgressResponse struct {

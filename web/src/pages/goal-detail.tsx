@@ -1,15 +1,17 @@
+import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  GitBranch,
   ListChecks,
   Target,
   Trash2,
 } from "lucide-react"
 import { Link, useNavigate, useParams } from "react-router-dom"
-import { api } from "@/lib/api"
+import { api, ApiError } from "@/lib/api"
 import { formatNumber, formatDate } from "@/lib/format"
 import { difficultyLabel, goalStatusLabel, milestoneClass, milestoneTitle } from "@/lib/labels"
 import { ProgressBar } from "@/components/shared/progress-bar"
@@ -18,10 +20,124 @@ import { PageHeader } from "@/components/shared/page-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { TaskCreateDialog } from "@/components/dialogs/task-create-dialog"
 import { PenaltyDialog } from "@/components/dialogs/penalty-dialog"
 import { ConfirmDialog } from "@/components/shared/confirm-dialog"
 import { toast } from "sonner"
+
+function ParentDialog({ goalId, currentParentId }: { goalId: string; currentParentId?: string }) {
+  const queryClient = useQueryClient()
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const [parentId, setParentId] = useState("none")
+  const [error, setError] = useState("")
+  const goals = useQuery({ queryKey: ["goals"], queryFn: api.goals.list })
+
+  useEffect(() => {
+    if (open) setParentId(currentParentId ?? "none")
+  }, [open, currentParentId])
+
+  const forbidden = useMemo(() => {
+    const set = new Set<string>([goalId])
+    const all = goals.data ?? []
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const g of all) {
+        if (g.parent_goal_id && set.has(g.parent_goal_id) && !set.has(g.id)) {
+          set.add(g.id)
+          changed = true
+        }
+      }
+    }
+    return set
+  }, [goals.data, goalId])
+
+  const mutation = useMutation({
+    mutationFn: () => api.goals.setParent(goalId, parentId === "none" ? "" : parentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["goals"] })
+      queryClient.invalidateQueries({ queryKey: ["transactions"] })
+      setOpen(false)
+      toast.success(t("goalDetail.parentChanged"))
+    },
+    onError: (err) => {
+      setError(err instanceof ApiError ? err.message : t("goalDetail.errParent"))
+    },
+  })
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError("")
+    mutation.mutate()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-5 px-1 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <GitBranch className="size-3" />
+          {t("goalDetail.changeParent")}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t("goalDetail.parentDialogTitle")}</DialogTitle>
+          <DialogDescription>
+            {t("goalDetail.parentDialogDesc")}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="goal-parent">{t("goals.parent")}</Label>
+            <Select value={parentId} onValueChange={setParentId}>
+              <SelectTrigger id="goal-parent" className="w-full">
+                <SelectValue placeholder={t("goals.noParent")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("goals.noParent")}</SelectItem>
+                {(goals.data ?? [])
+                  .filter((g) => !forbidden.has(g.id))
+                  .map((g) => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.title}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? t("common.creating") : t("common.create")}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export default function GoalDetailPage() {
   const { goalId } = useParams<{ goalId: string }>()
@@ -38,6 +154,11 @@ export default function GoalDetailPage() {
     queryKey: ["goals", goalId, "progress"],
     queryFn: () => api.goals.progress(goalId!),
     enabled: !!goalId,
+  })
+  const allGoals = useQuery({
+    queryKey: ["goals"],
+    queryFn: api.goals.list,
+    enabled: !!goal.data?.parent_goal_id,
   })
   const tasks = useQuery({
     queryKey: ["tasks"],
@@ -137,6 +258,21 @@ export default function GoalDetailPage() {
                 <p className="text-sm text-muted-foreground">
                   {t("goalDetail.earned", { earned: formatNumber(p.earned_gpp), total: formatNumber(g.total_gpp) })}
                 </p>
+                <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  {(() => {
+                    const parentGoal = allGoals.data?.find((x) => x.id === g.parent_goal_id)
+                    if (!parentGoal) return null
+                    return (
+                      <Link
+                        to={`/goals/${parentGoal.id}`}
+                        className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                      >
+                        {t("goalDetail.inherits", { title: parentGoal.title })}
+                      </Link>
+                    )
+                  })()}
+                  <ParentDialog goalId={g.id} currentParentId={g.parent_goal_id} />
+                </div>
               </div>
             </div>
             <StatusBadge

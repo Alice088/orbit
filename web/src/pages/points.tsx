@@ -159,7 +159,7 @@ export default function PointsPage() {
   const groups = useMemo(() => {
     const map = new Map<string, Transaction[]>()
     for (const tx of txs.data?.items ?? []) {
-      const key = tx.domain_event_id ?? tx.id
+      const key = tx.domain_event_id ? `${tx.domain_event_id}|${tx.reason}` : tx.id
       const arr = map.get(key)
       if (arr) arr.push(tx)
       else map.set(key, [tx])

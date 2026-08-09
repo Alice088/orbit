@@ -16,6 +16,7 @@ type PointTransaction struct {
 	Amount        int
 	Reason        string
 	GoalID        *string
+	SourceGoalID  *string
 	DomainEventID *string
 	CreatedAt     time.Time
 }

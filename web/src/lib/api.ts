@@ -101,6 +101,7 @@ export interface Goal {
   title: string
   total_gpp: number
   status: string
+  parent_goal_id?: string
   created_at: string
   milestones: Milestone[]
 }
@@ -232,10 +233,15 @@ export const api = {
 
   goals: {
     list: () => get<Goal[]>("/v1/goals"),
-    create: (body: { title: string; total_gpp: number }) =>
+    create: (body: { title: string; total_gpp: number; parent_goal_id?: string }) =>
       post<Goal>("/v1/goals", body),
     detail: (id: string) => get<Goal>(`/v1/goals/${id}`),
     progress: (id: string) => get<GoalProgress>(`/v1/goals/${id}/progress`),
+    setParent: (id: string, parent_goal_id: string) =>
+      request<Goal>(`/v1/goals/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ parent_goal_id }),
+      }),
     review: (id: string) => post<void>(`/v1/goals/${id}/review`),
     remove: (id: string) => del<void>(`/v1/goals/${id}`),
   },

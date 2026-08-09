@@ -20,12 +20,13 @@ import (
 )
 
 var (
-	ErrValidation     = errors.New("validation failed")
-	ErrTaskCompleted  = errors.New("task already completed")
-	ErrWrongOwner     = errors.New("resource belongs to another user")
-	ErrInactiveGoal   = errors.New("goal is not active")
+	ErrValidation      = errors.New("validation failed")
+	ErrTaskCompleted   = errors.New("task already completed")
+	ErrWrongOwner      = errors.New("resource belongs to another user")
+	ErrInactiveGoal    = errors.New("goal is not active")
+	ErrGoalHasChildren = errors.New("у цели есть дочерние цели — сначала удали их")
 	ErrAccountNotFound = errors.New("аккаунт с таким именем не найден")
-	ErrHabitDoneToday = errors.New("привычка уже выполнена сегодня")
+	ErrHabitDoneToday  = errors.New("привычка уже выполнена сегодня")
 )
 
 const maxMilestoneRepeatLevel = 99999999
@@ -148,14 +149,29 @@ func dayKey(t time.Time) string {
 
 var goalMilestonePercents = []int{1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100}
 
-func (s *Service) CreateGoal(ctx context.Context, userID string, title string, totalGPP int) (*entity.Goal, error) {
+func (s *Service) CreateGoal(ctx context.Context, userID string, title string, totalGPP int, parentGoalID string) (*entity.Goal, error) {
 	if totalGPP <= 0 {
 		return nil, ErrValidation
 	}
 	var goal *entity.Goal
 	err := s.withTx(ctx, func(tx pgx.Tx) error {
 		store := repository.NewStore(tx)
+		if parentGoalID != "" {
+			parent, err := store.Goal.GetByID(ctx, parentGoalID)
+			if err != nil {
+				if errors.Is(err, repository.ErrNotFound) {
+					return ErrValidation
+				}
+				return err
+			}
+			if parent.UserID != userID {
+				return ErrWrongOwner
+			}
+		}
 		g := &entity.Goal{UserID: userID, Title: title, TotalGPP: totalGPP, Status: entity.GoalStatusActive}
+		if parentGoalID != "" {
+			g.ParentGoalID = &parentGoalID
+		}
 		if err := store.Goal.Create(ctx, g); err != nil {
 			return err
 		}
@@ -247,11 +263,8 @@ func (s *Service) CompleteTask(ctx context.Context, userID string, taskID string
 		if err := store.Event.Insert(ctx, ev); err != nil {
 			return err
 		}
-		if gpp > 0 {
-			if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
-				UserID: userID, Currency: entity.CurrencyGPP, Amount: gpp,
-				Reason: "task_completed", GoalID: &task.GoalID, DomainEventID: &ev.ID,
-			}); err != nil {
+	if gpp > 0 {
+			if err := s.creditGPPChain(ctx, store, userID, task.GoalID, gpp, "task_completed", ev.ID); err != nil {
 				return err
 			}
 		}
@@ -742,15 +755,17 @@ func (s *Service) AddPenalty(ctx context.Context, userID string, amount int, rea
 		if err := store.Event.Insert(ctx, ev); err != nil {
 			return err
 		}
-		var goalIDPtr *string
-		if goalID != "" {
-			goalIDPtr = &goalID
-		}
-		if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
-			UserID: userID, Currency: currency, Amount: -amount,
-			Reason: penalty.ReasonManual, GoalID: goalIDPtr, DomainEventID: &ev.ID,
-		}); err != nil {
-			return err
+		if currency == entity.CurrencyGPP {
+			if err := s.creditGPPChain(ctx, store, userID, goalID, -amount, penalty.ReasonManual, ev.ID); err != nil {
+				return err
+			}
+		} else {
+			if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
+				UserID: userID, Currency: currency, Amount: -amount,
+				Reason: penalty.ReasonManual, DomainEventID: &ev.ID,
+			}); err != nil {
+				return err
+			}
 		}
 		stats := &entity.DailyStats{UserID: userID, Day: s.today()}
 		if currency == entity.CurrencyXP {
@@ -798,10 +813,11 @@ func (s *Service) DeleteTask(ctx context.Context, userID string, taskID string) 
 					return err
 				}
 				stats := &entity.DailyStats{UserID: userID, Day: s.dayOf(ev.OccurredAt), TasksCompleted: -1}
+				gppReversed := false
 				for _, t := range txs {
 					if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
 						UserID: userID, Currency: t.Currency, Amount: -t.Amount,
-						Reason: "task_deleted", GoalID: t.GoalID, DomainEventID: &reversal.ID,
+						Reason: "task_deleted", GoalID: t.GoalID, SourceGoalID: t.SourceGoalID, DomainEventID: &reversal.ID,
 					}); err != nil {
 						return err
 					}
@@ -810,7 +826,10 @@ func (s *Service) DeleteTask(ctx context.Context, userID string, taskID string) 
 						stats.XPEarned -= t.Amount
 						stats.TaskXP -= t.Amount
 					case entity.CurrencyGPP:
-						stats.GPPEarned -= t.Amount
+						if !gppReversed {
+							stats.GPPEarned -= t.Amount
+							gppReversed = true
+						}
 					}
 				}
 				if err := store.Stats.UpsertDailyStats(ctx, stats); err != nil {
@@ -819,6 +838,130 @@ func (s *Service) DeleteTask(ctx context.Context, userID string, taskID string) 
 			}
 		}
 		return store.Task.Delete(ctx, taskID)
+	})
+}
+
+func (s *Service) creditGPPChain(ctx context.Context, store *repository.Store, userID string, goalID string, amount int, reason string, eventID string) error {
+	chain, err := s.goalAncestors(ctx, store, goalID)
+	if err != nil {
+		return err
+	}
+	for i, id := range chain {
+		rowReason := reason
+		var sourceGoalID *string
+		if i > 0 {
+			rowReason = "goal_inherited"
+			sourceGoalID = &goalID
+		}
+		gid := id
+		if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
+			UserID: userID, Currency: entity.CurrencyGPP, Amount: amount,
+			Reason: rowReason, GoalID: &gid, SourceGoalID: sourceGoalID, DomainEventID: &eventID,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) goalAncestors(ctx context.Context, store *repository.Store, start string) ([]string, error) {
+	var out []string
+	seen := map[string]bool{}
+	for id := start; id != "" && !seen[id]; {
+		seen[id] = true
+		out = append(out, id)
+		parentID, err := store.Goal.ParentGoalID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		id = ""
+		if parentID != nil {
+			id = *parentID
+		}
+	}
+	return out, nil
+}
+
+func (s *Service) goalSubtree(ctx context.Context, store *repository.Store, root string) (map[string]bool, error) {
+	seen := map[string]bool{root: true}
+	queue := []string{root}
+	for len(queue) > 0 {
+		children, err := store.Goal.ChildIDs(ctx, queue[0])
+		if err != nil {
+			return nil, err
+		}
+		queue = queue[1:]
+		for _, c := range children {
+			if !seen[c] {
+				seen[c] = true
+				queue = append(queue, c)
+			}
+		}
+	}
+	return seen, nil
+}
+
+func (s *Service) SetGoalParent(ctx context.Context, userID string, goalID string, parentGoalID string) error {
+	return s.withTx(ctx, func(tx pgx.Tx) error {
+		store := repository.NewStore(tx)
+		goal, err := store.Goal.GetByID(ctx, goalID)
+		if err != nil {
+			return err
+		}
+		if goal.UserID != userID {
+			return ErrWrongOwner
+		}
+		subtree, err := s.goalSubtree(ctx, store, goalID)
+		if err != nil {
+			return err
+		}
+		ancestors := []string{}
+		if parentGoalID != "" {
+			if parentGoalID == goalID {
+				return ErrValidation
+			}
+			parent, err := store.Goal.GetByID(ctx, parentGoalID)
+			if err != nil {
+				if errors.Is(err, repository.ErrNotFound) {
+					return ErrValidation
+				}
+				return err
+			}
+			if parent.UserID != userID {
+				return ErrWrongOwner
+			}
+			if subtree[parentGoalID] {
+				return ErrValidation
+			}
+			ancestors, err = s.goalAncestors(ctx, store, parentGoalID)
+			if err != nil {
+				return err
+			}
+		}
+		sourceIDs := make([]string, 0, len(subtree))
+		for id := range subtree {
+			sourceIDs = append(sourceIDs, id)
+		}
+		if err := store.Ledger.DeleteInheritedBySource(ctx, userID, sourceIDs); err != nil {
+			return err
+		}
+		for _, srcID := range sourceIDs {
+			rows, err := store.Ledger.OwnGPPRows(ctx, userID, srcID)
+			if err != nil {
+				return err
+			}
+			for _, row := range rows {
+				for _, ancID := range ancestors {
+					if err := store.Ledger.Insert(ctx, &entity.PointTransaction{
+						UserID: userID, Currency: entity.CurrencyGPP, Amount: row.Amount,
+						Reason: "goal_inherited", GoalID: &ancID, SourceGoalID: &srcID, DomainEventID: row.DomainEventID,
+					}); err != nil {
+						return err
+					}
+				}
+			}
+		}
+		return store.Goal.SetParent(ctx, goalID, parentGoalID)
 	})
 }
 
@@ -832,10 +975,20 @@ func (s *Service) DeleteGoal(ctx context.Context, userID string, goalID string) 
 		if goal.UserID != userID {
 			return ErrWrongOwner
 		}
+		hasChildren, err := store.Goal.HasChildren(ctx, goalID)
+		if err != nil {
+			return err
+		}
+		if hasChildren {
+			return ErrGoalHasChildren
+		}
 		if err := store.Task.DeleteByGoal(ctx, goalID); err != nil {
 			return err
 		}
 		if err := store.Ledger.DeleteGPPByGoal(ctx, userID, goalID); err != nil {
+			return err
+		}
+		if err := store.Ledger.DeleteInheritedBySource(ctx, userID, []string{goalID}); err != nil {
 			return err
 		}
 		ev := &entity.DomainEvent{

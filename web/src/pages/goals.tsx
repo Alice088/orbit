@@ -24,6 +24,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Skeleton } from "@/components/ui/skeleton"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { toast } from "sonner"
 
 function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
@@ -32,7 +39,9 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState("")
   const [total, setTotal] = useState("1000")
+  const [parentId, setParentId] = useState("none")
   const [error, setError] = useState("")
+  const goals = useQuery({ queryKey: ["goals"], queryFn: api.goals.list })
 
   const totalNum = Number(total) || 0
 
@@ -41,6 +50,7 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
       api.goals.create({
         title,
         total_gpp: totalNum,
+        parent_goal_id: parentId === "none" ? undefined : parentId,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["goals"] })
@@ -98,6 +108,22 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
               onChange={(e) => setTotal(e.target.value)}
             />
           </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="goal-parent">{t("goals.parent")}</Label>
+            <Select value={parentId} onValueChange={setParentId}>
+              <SelectTrigger id="goal-parent" className="w-full">
+                <SelectValue placeholder={t("goals.noParent")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">{t("goals.noParent")}</SelectItem>
+                {(goals.data ?? []).map((g) => (
+                  <SelectItem key={g.id} value={g.id}>
+                    {g.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={mutation.isPending}>
@@ -110,11 +136,21 @@ function GoalCreateDialog({ onCreated }: { onCreated?: () => void }) {
   )
 }
 
-function GoalList({ items, progress }: { items: Goal[]; progress: GoalProgress[] | undefined }) {
+function GoalList({
+  items,
+  progress,
+  byId,
+}: {
+  items: Goal[]
+  progress: GoalProgress[] | undefined
+  byId: Record<string, Goal>
+}) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-4">
       {items.map((g) => {
         const prog = progress?.find((p) => p.goal_id === g.id)
+        const parent = g.parent_goal_id ? byId[g.parent_goal_id] : undefined
         return (
           <Link key={g.id} to={`/goals/${g.id}`} className="group block">
             <Card className="shadow-none transition-colors hover:bg-accent/40">
@@ -128,7 +164,9 @@ function GoalList({ items, progress }: { items: Goal[]; progress: GoalProgress[]
                       {g.title}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {formatDate(g.created_at)}
+                      {parent
+                        ? t("goals.inherits", { title: parent.title })
+                        : formatDate(g.created_at)}
                     </p>
                   </div>
                 </div>
@@ -178,6 +216,7 @@ export default function GoalsPage() {
 
   const activeGoals = (goals.data ?? []).filter((g) => g.status !== "completed")
   const completedGoals = (goals.data ?? []).filter((g) => g.status === "completed")
+  const byId = Object.fromEntries((goals.data ?? []).map((g) => [g.id, g]))
 
   return (
     <div>
@@ -205,7 +244,7 @@ export default function GoalsPage() {
               action={<GoalCreateDialog />}
             />
           ) : (
-            <GoalList items={activeGoals} progress={progress.data} />
+            <GoalList items={activeGoals} progress={progress.data} byId={byId} />
           )}
         </TabsContent>
         <TabsContent value="completed" className="mt-4">
@@ -221,7 +260,7 @@ export default function GoalsPage() {
               description={t("goals.emptyCompletedDesc")}
             />
           ) : (
-            <GoalList items={completedGoals} progress={progress.data} />
+            <GoalList items={completedGoals} progress={progress.data} byId={byId} />
           )}
         </TabsContent>
       </Tabs>
