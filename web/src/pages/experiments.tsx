@@ -32,16 +32,6 @@ function ExperimentCard({ exp, onClick }: { exp: Experiment; onClick: () => void
             <StatusBadge label={statusLabel(t, cur.status)} variant={statusVariant(cur.status)} />
           )}
         </div>
-        {exp.category && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <StatusBadge label={exp.category} variant="active" />
-            {exp.tags.map((tag) => (
-              <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
         {cur?.primary_summary && (
           <div className="flex items-center justify-between rounded-md bg-muted/60 px-3 py-2 text-sm">
             <span className="tabular-nums">{primaryLine(cur.primary_summary)}</span>
@@ -133,7 +123,7 @@ export default function ExperimentsPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         onSaved={(expId) => {
-          navigate(`/experiments/${expId}`)
+          navigate(`/experiments/${expId}`, { state: { openVersionEditor: true } })
         }}
       />
     </div>

@@ -13,8 +13,6 @@ type MetricInput struct {
 
 type CreateExperimentRequest struct {
 	Title           string        `json:"title"`
-	Category        string        `json:"category,omitempty"`
-	Tags            []string      `json:"tags,omitempty"`
 	Change          string        `json:"change"`
 	SuccessCriteria string        `json:"success_criteria,omitempty"`
 	DurationDays    int           `json:"duration_days"`
@@ -22,9 +20,7 @@ type CreateExperimentRequest struct {
 }
 
 type UpdateExperimentRequest struct {
-	Title    string   `json:"title,omitempty"`
-	Category string   `json:"category,omitempty"`
-	Tags     []string `json:"tags,omitempty"`
+	Title string `json:"title,omitempty"`
 }
 
 type UpdateVersionRequest struct {
@@ -141,16 +137,14 @@ type VersionResponse struct {
 }
 
 type ExperimentResponse struct {
-	ID             string                  `json:"id"`
-	Title          string                  `json:"title"`
-	Category       string                  `json:"category"`
-	Tags           []string                `json:"tags"`
-	CreatedAt      string                  `json:"created_at"`
-	ActiveCount    int                     `json:"active_count"`
-	CompletedCount int                     `json:"completed_count"`
-	AbortedCount   int                     `json:"aborted_count"`
-	TotalVersions  int                     `json:"total_versions"`
-	Current        *VersionSummaryResponse `json:"current,omitempty"`
-	Best           *BestResponse           `json:"best,omitempty"`
+	ID             string                   `json:"id"`
+	Title          string                   `json:"title"`
+	CreatedAt      string                   `json:"created_at"`
+	ActiveCount    int                      `json:"active_count"`
+	CompletedCount int                      `json:"completed_count"`
+	AbortedCount   int                      `json:"aborted_count"`
+	TotalVersions  int                      `json:"total_versions"`
+	Current        *VersionSummaryResponse  `json:"current,omitempty"`
+	Best           *BestResponse            `json:"best,omitempty"`
 	Versions       []VersionSummaryResponse `json:"versions,omitempty"`
 }

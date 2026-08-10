@@ -1,6 +1,6 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link, useNavigate, useParams } from "react-router-dom"
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom"
 import { ArrowLeft, FlaskConical, Play, Plus, Trash2 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { api, type ExperimentVersion } from "@/lib/api"
@@ -16,6 +16,7 @@ import { toast } from "sonner"
 export default function ExperimentDetailPage() {
   const { experimentId } = useParams()
   const navigate = useNavigate()
+  const location = useLocation()
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const exp = useQuery({
@@ -25,6 +26,20 @@ export default function ExperimentDetailPage() {
   })
   const [editOpen, setEditOpen] = useState(false)
   const [editVersion, setEditVersion] = useState<ExperimentVersion | undefined>()
+
+  useEffect(() => {
+    if (!location.state?.openVersionEditor || !exp.data) return
+    const cur = exp.data.current
+    if (!cur || cur.status !== "draft") return
+    navigate(location.pathname, { replace: true, state: null })
+    api.experiments
+      .version(exp.data.id, cur.id)
+      .then((v) => {
+        setEditVersion(v)
+        setEditOpen(true)
+      })
+      .catch((err) => toast.error(err instanceof Error ? err.message : String(err)))
+  }, [location.state, exp.data, navigate, location.pathname])
 
   const fork = useMutation({
     mutationFn: () => api.experiments.fork(experimentId!),
@@ -99,14 +114,6 @@ export default function ExperimentDetailPage() {
                 variant="completed"
               />
             )}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            {e.category && <StatusBadge label={e.category} variant="active" />}
-            {e.tags.map((tag) => (
-              <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                {tag}
-              </span>
-            ))}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
             {t("experiments.versionsCount", { n: e.total_versions })} ·{" "}

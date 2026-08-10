@@ -12,7 +12,7 @@ It rests on five principles:
 
 ## Family and versions
 
-An experiment is a family of versions. Title, category and tags describe the family; each version is a separate run with its own change, metrics, baseline, check-ins and result.
+An experiment is a family of versions. The title describes the family; each version is a separate run with its own change, metrics, baseline, check-ins and result.
 
 v1 → v2 → v3 — versions are never overwritten. A new version is a fork of the previous one: tweak the method and start over. If you fork mid-run, the current version is marked aborted and no longer counts toward family statistics.
 

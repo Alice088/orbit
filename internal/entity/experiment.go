@@ -41,8 +41,6 @@ type Experiment struct {
 	ID        string
 	UserID    string
 	Title     string
-	Category  string
-	Tags      []string
 	CreatedAt time.Time
 }
 

@@ -1,0 +1,2 @@
+ALTER TABLE experiments ADD COLUMN category TEXT NOT NULL DEFAULT '';
+ALTER TABLE experiments ADD COLUMN tags TEXT[] NOT NULL DEFAULT '{}';

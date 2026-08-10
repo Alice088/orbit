@@ -19,17 +19,17 @@ func NewExperimentRepo(q Querier) *ExperimentRepo {
 
 func (r *ExperimentRepo) CreateExperiment(ctx context.Context, e *entity.Experiment) error {
 	row := r.q.QueryRow(ctx,
-		`INSERT INTO experiments (user_id, title, category, tags)
-		 VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
-		e.UserID, e.Title, e.Category, e.Tags)
+		`INSERT INTO experiments (user_id, title)
+		 VALUES ($1, $2) RETURNING id, created_at`,
+		e.UserID, e.Title)
 	return row.Scan(&e.ID, &e.CreatedAt)
 }
 
 func (r *ExperimentRepo) GetExperiment(ctx context.Context, id string) (*entity.Experiment, error) {
 	row := r.q.QueryRow(ctx,
-		`SELECT id, user_id, title, category, tags, created_at FROM experiments WHERE id = $1`, id)
+		`SELECT id, user_id, title, created_at FROM experiments WHERE id = $1`, id)
 	var e entity.Experiment
-	if err := row.Scan(&e.ID, &e.UserID, &e.Title, &e.Category, &e.Tags, &e.CreatedAt); err != nil {
+	if err := row.Scan(&e.ID, &e.UserID, &e.Title, &e.CreatedAt); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -40,7 +40,7 @@ func (r *ExperimentRepo) GetExperiment(ctx context.Context, id string) (*entity.
 
 func (r *ExperimentRepo) ListExperimentsByUser(ctx context.Context, userID string) ([]entity.Experiment, error) {
 	rows, err := r.q.Query(ctx,
-		`SELECT id, user_id, title, category, tags, created_at FROM experiments
+		`SELECT id, user_id, title, created_at FROM experiments
 		 WHERE user_id = $1 ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (r *ExperimentRepo) ListExperimentsByUser(ctx context.Context, userID strin
 	var out []entity.Experiment
 	for rows.Next() {
 		var e entity.Experiment
-		if err := rows.Scan(&e.ID, &e.UserID, &e.Title, &e.Category, &e.Tags, &e.CreatedAt); err != nil {
+		if err := rows.Scan(&e.ID, &e.UserID, &e.Title, &e.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, e)
@@ -59,8 +59,8 @@ func (r *ExperimentRepo) ListExperimentsByUser(ctx context.Context, userID strin
 
 func (r *ExperimentRepo) UpdateExperiment(ctx context.Context, e *entity.Experiment) error {
 	_, err := r.q.Exec(ctx,
-		`UPDATE experiments SET title = $2, category = $3, tags = $4 WHERE id = $1`,
-		e.ID, e.Title, e.Category, e.Tags)
+		`UPDATE experiments SET title = $2 WHERE id = $1`,
+		e.ID, e.Title)
 	return err
 }
 

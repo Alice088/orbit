@@ -39,11 +39,7 @@ func (s *Service) CreateExperiment(ctx context.Context, userID string, in dto.Cr
 	if err != nil {
 		return nil, err
 	}
-	tags := in.Tags
-	if tags == nil {
-		tags = []string{}
-	}
-	exp := &entity.Experiment{UserID: userID, Title: title, Category: in.Category, Tags: tags}
+	exp := &entity.Experiment{UserID: userID, Title: title}
 	err = s.withTx(ctx, func(tx pgx.Tx) error {
 		store := repository.NewStore(tx)
 		if err := store.Experiment.CreateExperiment(ctx, exp); err != nil {
@@ -117,11 +113,6 @@ func (s *Service) UpdateExperiment(ctx context.Context, userID string, experimen
 			return ErrWrongOwner
 		}
 		exp.Title = title
-		exp.Category = in.Category
-		exp.Tags = in.Tags
-		if exp.Tags == nil {
-			exp.Tags = []string{}
-		}
 		return store.Experiment.UpdateExperiment(ctx, exp)
 	})
 }
@@ -674,8 +665,7 @@ func (s *Service) experimentPayload(ctx context.Context, store *repository.Store
 		return nil, err
 	}
 	resp := &dto.ExperimentResponse{
-		ID: exp.ID, Title: exp.Title, Category: exp.Category,
-		Tags: exp.Tags, CreatedAt: exp.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		ID: exp.ID, Title: exp.Title, CreatedAt: exp.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 	bestID, bestChange := s.familyBest(ctx, store, exp.ID)
 	summaries := make([]dto.VersionSummaryResponse, 0, len(versions))

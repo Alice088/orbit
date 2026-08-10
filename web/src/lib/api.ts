@@ -325,8 +325,6 @@ export interface Best {
 export interface Experiment {
   id: string
   title: string
-  category: string
-  tags: string[]
   created_at: string
   active_count: number
   completed_count: number
@@ -417,17 +415,9 @@ export const api = {
 
   experiments: {
     list: () => get<Experiment[]>("/v1/experiments"),
-    create: (body: {
-      title: string
-      category: string
-      tags: string[]
-      change: string
-      success_criteria: string
-      duration_days: number
-      metrics: MetricInput[]
-    }) => post<Experiment>("/v1/experiments", body),
+    create: (body: { title: string }) => post<Experiment>("/v1/experiments", body),
     detail: (id: string) => get<Experiment>(`/v1/experiments/${id}`),
-    update: (id: string, body: { title: string; category: string; tags: string[] }) =>
+    update: (id: string, body: { title: string }) =>
       request<void>(`/v1/experiments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
     remove: (id: string) => del<void>(`/v1/experiments/${id}`),
     fork: (id: string) => post<ExperimentVersion>(`/v1/experiments/${id}/versions`),

@@ -84,8 +84,6 @@ export function ExperimentFormDialog({
   const queryClient = useQueryClient()
   const editing = Boolean(version)
   const [title, setTitle] = useState(experiment?.title ?? "")
-  const [category, setCategory] = useState(experiment?.category ?? "")
-  const [tags, setTags] = useState((experiment?.tags ?? []).join(", "))
   const [change, setChange] = useState(version?.change ?? "")
   const [criteria, setCriteria] = useState(version?.success_criteria ?? "")
   const [duration, setDuration] = useState(version?.duration_days != null ? String(version.duration_days) : "7")
@@ -97,46 +95,37 @@ export function ExperimentFormDialog({
   const [error, setError] = useState("")
 
   const mutation = useMutation({
-    mutationFn: async () => {
-      const metrics: MetricInput[] = rows.map((r) => ({
-        name: r.name,
-        type: r.type,
-        unit: r.unit.trim(),
-        direction: r.direction,
-        is_primary: r.is_primary,
-        baseline_source: r.baseline_source,
-        baseline_value: r.baseline_value === "" ? undefined : Number(r.baseline_value),
-        baseline_denom: r.baseline_denom === "" ? undefined : Number(r.baseline_denom),
-      }))
-      const body = {
-        title: title.trim(),
-        category: category.trim(),
-        tags: tags
-          .split(",")
-          .map((x) => x.trim())
-          .filter(Boolean),
-        change: change.trim(),
-        success_criteria: criteria.trim(),
-        duration_days: editing ? Number(duration) : 0,
-        metrics,
-      }
+    mutationFn: async ({ start }: { start: boolean }) => {
       let expId: string
       let versionId: string
       if (editing && version) {
         expId = version.experiment_id
         versionId = version.id
+        const metrics: MetricInput[] = rows.map((r) => ({
+          name: r.name,
+          type: r.type,
+          unit: r.unit.trim(),
+          direction: r.direction,
+          is_primary: r.is_primary,
+          baseline_source: r.baseline_source,
+          baseline_value: r.baseline_value === "" ? undefined : Number(r.baseline_value),
+          baseline_denom: r.baseline_denom === "" ? undefined : Number(r.baseline_denom),
+        }))
         await api.experiments.updateVersion(expId, versionId, {
-          change: body.change,
-          success_criteria: body.success_criteria,
-          duration_days: body.duration_days,
+          change: change.trim(),
+          success_criteria: criteria.trim(),
+          duration_days: Number(duration),
           metrics,
         })
+        if (start) {
+          await api.experiments.start(expId, versionId)
+        }
       } else {
-        const created = await api.experiments.create(body)
+        const created = await api.experiments.create({ title: title.trim() })
         expId = created.id
         versionId = created.versions[0].id
       }
-      return { expId, versionId, started: false }
+      return { expId, versionId, started: start }
     },
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["experiments"] })
@@ -154,6 +143,7 @@ export function ExperimentFormDialog({
       setError(t("experiments.errTitle"))
       return false
     }
+    if (!editing) return true
     if (!rows.some((r) => r.name.trim())) {
       setError(t("experiments.errMetric"))
       return false
@@ -187,10 +177,10 @@ export function ExperimentFormDialog({
     return true
   }
 
-  function submit() {
+  function submit(start: boolean) {
     setError("")
     if (!validate()) return
-    mutation.mutate()
+    mutation.mutate({ start })
   }
 
   function setRow(index: number, patch: Partial<MetricRow>) {
@@ -224,12 +214,14 @@ export function ExperimentFormDialog({
           <DialogTitle>
             {editing ? t("experiments.editVersion") : t("experiments.create")}
           </DialogTitle>
-          <DialogDescription>{t("experiments.dialogDesc")}</DialogDescription>
+          <DialogDescription>
+            {editing ? t("experiments.dialogDesc") : t("experiments.createDesc")}
+          </DialogDescription>
         </DialogHeader>
         <form
           onSubmit={(e) => {
             e.preventDefault()
-            submit()
+            submit(false)
           }}
           className="flex flex-col gap-4"
         >
@@ -244,41 +236,21 @@ export function ExperimentFormDialog({
               />
             </div>
           )}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="exp-category">{t("experiments.category")}</Label>
-            <Input
-              id="exp-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder={t("experiments.categoryPlaceholder")}
-            />
-          </div>
           {editing && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="exp-duration">{t("experiments.duration")}</Label>
-              <Input
-                id="exp-duration"
-                type="number"
-                min={1}
-                max={365}
-                value={duration}
-                onChange={(e) => setDuration(e.target.value)}
-              />
-            </div>
-          )}
-          {!editing && (
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="exp-tags">{t("experiments.tags")}</Label>
-              <Input
-                id="exp-tags"
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder={t("experiments.tagsPlaceholder")}
-              />
-            </div>
-          )}
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="exp-change">{t("experiments.change")}</Label>
+            <>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="exp-duration">{t("experiments.duration")}</Label>
+                <Input
+                  id="exp-duration"
+                  type="number"
+                  min={1}
+                  max={365}
+                  value={duration}
+                  onChange={(e) => setDuration(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="exp-change">{t("experiments.change")}</Label>
             <Textarea
               id="exp-change"
               value={change}
@@ -453,22 +425,34 @@ export function ExperimentFormDialog({
                 )
               })}
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setRows((prev) => [...prev, emptyMetric(editing ? "measured" : "none")])}
-            >
-              <Plus className="size-4" />
-              {t("experiments.addMetric")}
-            </Button>
-          </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setRows((prev) => [...prev, emptyMetric("measured")])}
+              >
+                <Plus className="size-4" />
+                {t("experiments.addMetric")}
+              </Button>
+              </div>
+            </>
+          )}
 
           {error && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={isBusy}>
-              {isBusy ? t("common.saving") : editing ? t("common.save") : t("experiments.saveDraft")}
+              {isBusy ? t("common.saving") : editing ? t("common.save") : t("common.create")}
             </Button>
+            {editing && (
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isBusy}
+                onClick={() => submit(true)}
+              >
+                {isBusy ? t("common.saving") : t("experiments.saveAndStart")}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
