@@ -819,6 +819,8 @@ func (s *Service) versionPayload(ctx context.Context, store *repository.Store, e
 		DurationDays:    v.DurationDays,
 		Status:          string(status),
 		Reflection:      v.Reflection,
+		Metrics:         []dto.MetricResponse{},
+		Checkins:        []dto.CheckinResponse{},
 	}
 	if v.StartedAt != nil {
 		t := v.StartedAt.Format("2006-01-02")

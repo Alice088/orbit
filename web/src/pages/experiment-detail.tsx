@@ -179,7 +179,7 @@ export default function ExperimentDetailPage() {
                       {t("experiments.editDraft")}
                     </Button>
                   )}
-                  {v.status === "draft" && v.is_current && (
+                  {v.status === "draft" && v.is_current && v.primary_summary && (
                     <Button
                       size="sm"
                       onClick={(e) => {

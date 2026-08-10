@@ -26,11 +26,11 @@ function CheckinForm({
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const day = todayKey()
-  const existing = version.checkins.find((c) => c.day === day)
+  const existing = (version.checkins ?? []).find((c) => c.day === day)
   const [note, setNote] = useState(existing?.note ?? "")
   const [values, setValues] = useState<Record<string, string>>(() => {
     const map: Record<string, string> = {}
-    for (const c of version.checkins) {
+    for (const c of version.checkins ?? []) {
       if (c.day !== day) continue
       for (const v of c.values) {
         if (v.text_value != null) {
@@ -56,7 +56,7 @@ function CheckinForm({
   const mutation = useMutation({
     mutationFn: () => {
       const payload: CheckinValue[] = []
-      for (const m of version.metrics) {
+      for (const m of version.metrics ?? []) {
         const key = m.id
         const numRaw = m.type === "rate" ? values[`${key}:num`] : values[key]
         const denRaw = values[`${key}:den`]
@@ -85,7 +85,7 @@ function CheckinForm({
     onError: (err) => setError(err instanceof Error ? err.message : String(err)),
   })
 
-  const primary = version.metrics.find((m) => m.is_primary)
+  const primary = (version.metrics ?? []).find((m) => m.is_primary)
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -113,7 +113,7 @@ function CheckinForm({
           {existing && <StatusBadge label={t("experiments.checkinDone")} variant="completed" />}
         </div>
         <form onSubmit={submit} className="flex flex-col gap-3">
-          {version.metrics.map((m) => (
+          {(version.metrics ?? []).map((m) => (
             <MetricField key={m.id} metric={m} values={values} setValues={setValues} />
           ))}
           <div className="flex flex-col gap-1.5">
@@ -369,11 +369,11 @@ export default function VersionDetailPage() {
         </Card>
       )}
 
-      {v.metrics.length > 0 && (
+      {(v.metrics ?? []).length > 0 && (
         <div className="mb-6">
           <h3 className="mb-3 text-sm font-medium">{t("experiments.metrics")}</h3>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {v.metrics.map((m) => (
+            {(v.metrics ?? []).map((m) => (
               <MetricStatsCard key={m.id} metric={m} />
             ))}
           </div>
@@ -422,11 +422,11 @@ export default function VersionDetailPage() {
         </Card>
       )}
 
-      {v.checkins.length > 0 && (
+      {(v.checkins ?? []).length > 0 && (
         <div>
           <h3 className="mb-3 text-sm font-medium">{t("experiments.history")}</h3>
           <div className="flex flex-col gap-2">
-            {[...v.checkins].reverse().map((c) => (
+            {[...(v.checkins ?? [])].reverse().map((c) => (
               <Card key={c.id} className="shadow-none">
                 <CardContent className="flex flex-col gap-2 p-4">
                   <div className="flex items-center justify-between gap-2">
@@ -442,7 +442,7 @@ export default function VersionDetailPage() {
                     </Button>
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                    {v.metrics.map((m) => {
+                    {(v.metrics ?? []).map((m) => {
                       const val = c.values.find((x) => x.metric_id === m.id)
                       if (!val) return null
                       const rendered = formatMetricValue(
