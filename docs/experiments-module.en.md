@@ -33,9 +33,13 @@ Exactly one metric is primary: it is required in every check-in and drives the v
 
 ## Baseline
 
-A baseline is the starting point for comparison, set per metric per version. Source: none / manual / measured.
+A baseline is your average value before the experiment: Orbit compares results against it and shows "−33%" instead of a bare number. It is set per metric per version.
 
-The baseline is frozen when the version starts and never changed retroactively — otherwise comparison loses meaning. If you made a mistake, create a new version with a new baseline. Once the family has history, Orbit offers to use the average of past measurements as the baseline with one click.
+- none — nothing to compare against; Orbit only shows averages;
+- manual — you enter your own average;
+- from history — the average of your check-ins from previous completed versions of the same experiment (available from version two onwards).
+
+The baseline is frozen when the version starts and never changed retroactively — otherwise comparison loses meaning. If you made a mistake, create a new version with a new baseline.
 
 ## Check-in
 

@@ -31,21 +31,21 @@ interface MetricRow {
   baseline_denom: string
 }
 
-function emptyMetric(): MetricRow {
+function emptyMetric(source: MetricRow["baseline_source"] = "measured"): MetricRow {
   return {
     name: "",
     type: "count",
     unit: "",
     direction: "",
     is_primary: false,
-    baseline_source: "none",
+    baseline_source: source,
     baseline_value: "",
     baseline_denom: "",
   }
 }
 
-function fromMetric(m: ExperimentVersion["metrics"][number]): MetricRow {
-  return {
+function fromMetric(m: ExperimentVersion["metrics"][number], suggested?: number): MetricRow {
+  const row: MetricRow = {
     name: m.name,
     type: m.type,
     unit: m.unit ?? "",
@@ -55,6 +55,16 @@ function fromMetric(m: ExperimentVersion["metrics"][number]): MetricRow {
     baseline_value: m.baseline_value != null ? String(m.baseline_value) : "",
     baseline_denom: m.baseline_denom != null ? String(m.baseline_denom) : "",
   }
+  if (row.baseline_source === "none" && suggested != null) {
+    row.baseline_source = "measured"
+    if (row.type === "rate") {
+      row.baseline_value = String(Math.round(suggested * 100))
+      row.baseline_denom = "100"
+    } else {
+      row.baseline_value = String(Math.round(suggested * 100) / 100)
+    }
+  }
+  return row
 }
 
 export function ExperimentFormDialog({
@@ -80,7 +90,9 @@ export function ExperimentFormDialog({
   const [criteria, setCriteria] = useState(version?.success_criteria ?? "")
   const [duration, setDuration] = useState(version?.duration_days != null ? String(version.duration_days) : "7")
   const [rows, setRows] = useState<MetricRow[]>(() =>
-    version && version.metrics.length > 0 ? version.metrics.map(fromMetric) : [emptyMetric()],
+    version && version.metrics.length > 0
+      ? version.metrics.map((m, i) => fromMetric(m, version.metrics[i].suggested_baseline))
+      : [emptyMetric(editing ? "measured" : "none")],
   )
   const [error, setError] = useState("")
 
@@ -387,6 +399,7 @@ export function ExperimentFormDialog({
                             <SelectItem value="measured">{t("experiments.baselineMeasured")}</SelectItem>
                           </SelectContent>
                         </Select>
+                        <p className="text-xs leading-relaxed text-muted-foreground">{t("experiments.baselineHint")}</p>
                         {row.baseline_source !== "none" && (
                           <div className="flex items-end gap-2">
                             {row.type === "rate" ? (
@@ -419,7 +432,7 @@ export function ExperimentFormDialog({
                                 className="w-24"
                               />
                             )}
-                            {row.baseline_source === "measured" && suggested != null && (
+                            {row.baseline_source === "measured" && suggested != null ? (
                               <Button
                                 type="button"
                                 variant="outline"
@@ -427,9 +440,11 @@ export function ExperimentFormDialog({
                                 onClick={() => useSuggestion(i, suggested)}
                               >
                                 <FlaskConical className="size-3.5" />
-                                {t("experiments.useHistory", { n: suggested })}
+                                {t("experiments.useHistory", { n: Math.round(suggested * 100) / 100 })}
                               </Button>
-                            )}
+                            ) : row.baseline_source === "measured" ? (
+                              <p className="pb-1.5 text-xs text-muted-foreground">{t("experiments.noHistoryHint")}</p>
+                            ) : null}
                           </div>
                         )}
                       </div>
@@ -442,7 +457,7 @@ export function ExperimentFormDialog({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setRows((prev) => [...prev, emptyMetric()])}
+              onClick={() => setRows((prev) => [...prev, emptyMetric(editing ? "measured" : "none")])}
             >
               <Plus className="size-4" />
               {t("experiments.addMetric")}
