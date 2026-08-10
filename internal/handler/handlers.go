@@ -16,20 +16,22 @@ import (
 )
 
 type Handlers struct {
-	Goals  *GoalHandler
-	Tasks  *TaskHandler
-	Habits *HabitHandler
-	Stats  *StatsHandler
-	Auth   *AuthHandler
+	Goals       *GoalHandler
+	Tasks       *TaskHandler
+	Habits      *HabitHandler
+	Stats       *StatsHandler
+	Auth        *AuthHandler
+	Experiments *ExperimentHandler
 }
 
 func NewHandlers(svc *service.Service, jwtManager *auth.JWTManager) *Handlers {
 	return &Handlers{
-		Goals:  &GoalHandler{svc: svc},
-		Tasks:  &TaskHandler{svc: svc},
-		Habits: &HabitHandler{svc: svc},
-		Stats:  &StatsHandler{svc: svc},
-		Auth:   &AuthHandler{svc: svc, jwt: jwtManager},
+		Goals:       &GoalHandler{svc: svc},
+		Tasks:       &TaskHandler{svc: svc},
+		Habits:      &HabitHandler{svc: svc},
+		Stats:       &StatsHandler{svc: svc},
+		Auth:        &AuthHandler{svc: svc, jwt: jwtManager},
+		Experiments: &ExperimentHandler{svc: svc},
 	}
 }
 
@@ -78,7 +80,15 @@ func statusFor(err error) int {
 		errors.Is(err, service.ErrInactiveGoal):
 		return http.StatusBadRequest
 	case errors.Is(err, service.ErrTaskCompleted),
-		errors.Is(err, service.ErrHabitDoneToday):
+		errors.Is(err, service.ErrHabitDoneToday),
+		errors.Is(err, service.ErrExperimentVersionLocked),
+		errors.Is(err, service.ErrExperimentRunningExists),
+		errors.Is(err, service.ErrCheckinNotAllowed),
+		errors.Is(err, service.ErrCheckinWindowClosed),
+		errors.Is(err, service.ErrCheckinFuture),
+		errors.Is(err, service.ErrVersionNotEnded),
+		errors.Is(err, service.ErrPrimaryRequired),
+		errors.Is(err, service.ErrVersionInUse):
 		return http.StatusConflict
 	case errors.Is(err, service.ErrWrongOwner):
 		return http.StatusForbidden

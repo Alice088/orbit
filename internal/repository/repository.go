@@ -19,9 +19,10 @@ type Store struct {
 	Task   *TaskRepo
 	Habit  *HabitRepo
 	Streak *StreakRepo
-	Event  *EventRepo
-	Ledger *LedgerRepo
-	Stats  *StatsRepo
+	Event      *EventRepo
+	Ledger     *LedgerRepo
+	Stats      *StatsRepo
+	Experiment *ExperimentRepo
 }
 
 func NewStore(q Querier) *Store {
@@ -32,7 +33,8 @@ func NewStore(q Querier) *Store {
 		Habit:  NewHabitRepo(q),
 		Streak: NewStreakRepo(q),
 		Event:  NewEventRepo(q),
-		Ledger: NewLedgerRepo(q),
-		Stats:  NewStatsRepo(q),
+		Ledger:     NewLedgerRepo(q),
+		Stats:      NewStatsRepo(q),
+		Experiment: NewExperimentRepo(q),
 	}
 }

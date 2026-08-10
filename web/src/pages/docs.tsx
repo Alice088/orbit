@@ -3,12 +3,14 @@ import { useLocation, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next"
 import ReactMarkdown, { type Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { BookOpen, Boxes, FlaskConical } from "lucide-react"
+import { BookOpen, Boxes, FlaskConical, Layers } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { implGroups } from "@/lib/docs-data"
 import { isEn } from "@/lib/i18n"
 import reportRu from "../../../docs/deep-research-report.md?raw"
 import reportEn from "../../../docs/deep-research-report.en.md?raw"
+import moduleRu from "../../../docs/experiments-module.md?raw"
+import moduleEn from "../../../docs/experiments-module.en.md?raw"
 
 function slugify(s: string): string {
   return s
@@ -35,6 +37,19 @@ const markdownComponents: Components = {
     >
       {children}
     </h2>
+  ),
+  h2: ({ children }: MdProps) => (
+    <h3
+      id={slugify(String(children))}
+      className="scroll-mt-20 pt-6 text-base font-semibold tracking-tight first:pt-0"
+    >
+      {children}
+    </h3>
+  ),
+  h3: ({ children }: MdProps) => (
+    <h4 id={slugify(String(children))} className="scroll-mt-20 pt-4 text-sm font-semibold tracking-tight">
+      {children}
+    </h4>
   ),
   p: ({ children }: MdProps) => (
     <p className="mt-3 text-sm leading-7 text-muted-foreground">{children}</p>
@@ -69,18 +84,32 @@ const markdownComponents: Components = {
       {children}
     </blockquote>
   ),
+  table: ({ children }: MdProps) => (
+    <div className="mt-4 overflow-x-auto">
+      <table className="w-full border-collapse text-sm">{children}</table>
+    </div>
+  ),
+  thead: ({ children }: MdProps) => (
+    <thead className="border-b border-border text-left">{children}</thead>
+  ),
+  th: ({ children }: MdProps) => (
+    <th className="border-b border-border px-2 py-1.5 text-left font-medium text-foreground">{children}</th>
+  ),
+  td: ({ children }: MdProps) => (
+    <td className="border-b border-border/60 px-2 py-1.5 align-top text-muted-foreground">{children}</td>
+  ),
 }
 
 function TabSwitcher({
   tab,
   onChange,
 }: {
-  tab: "theory" | "impl"
-  onChange: (t: "theory" | "impl") => void
+  tab: "theory" | "impl" | "module"
+  onChange: (t: "theory" | "impl" | "module") => void
 }) {
   const { t } = useTranslation()
   return (
-    <div className="inline-flex items-center rounded-lg bg-muted p-1 text-sm font-medium">
+    <div className="inline-flex max-w-full flex-wrap items-center rounded-lg bg-muted p-1 text-sm font-medium">
       <button
         type="button"
         onClick={() => onChange("theory")}
@@ -107,6 +136,19 @@ function TabSwitcher({
         <Boxes className="size-3.5" />
         {t("docs.implementation")}
       </button>
+      <button
+        type="button"
+        onClick={() => onChange("module")}
+        className={cn(
+          "flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-colors",
+          tab === "module"
+            ? "bg-background text-foreground shadow-sm"
+            : "text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <Layers className="size-3.5" />
+        {t("docs.module")}
+      </button>
     </div>
   )
 }
@@ -115,7 +157,8 @@ export default function DocsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const { t } = useTranslation()
-  const tab: "theory" | "impl" = searchParams.get("t") === "impl" ? "impl" : "theory"
+  const tab: "theory" | "impl" | "module" =
+    searchParams.get("t") === "impl" ? "impl" : searchParams.get("t") === "module" ? "module" : "theory"
 
   useEffect(() => {
     if (!location.hash) return
@@ -123,18 +166,23 @@ export default function DocsPage() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
   }, [location.hash, tab])
 
-  const switchTab = (t: "theory" | "impl") => {
-    setSearchParams(t === "impl" ? { t: "impl" } : {}, { replace: true })
+  const switchTab = (t: "theory" | "impl" | "module") => {
+    setSearchParams(t === "impl" ? { t: "impl" } : t === "module" ? { t: "module" } : {}, { replace: true })
     window.scrollTo({ top: 0 })
   }
 
   const report = isEn() ? reportEn : reportRu
+  const moduleDoc = isEn() ? moduleEn : moduleRu
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            {tab === "theory" ? t("docs.theorySubtitle") : t("docs.implSubtitle")}
+            {tab === "theory"
+              ? t("docs.theorySubtitle")
+              : tab === "impl"
+                ? t("docs.implSubtitle")
+                : t("docs.moduleSubtitle")}
           </p>
         </div>
         <TabSwitcher tab={tab} onChange={switchTab} />
@@ -144,6 +192,12 @@ export default function DocsPage() {
         <div className="mt-2 border-t border-border pt-2">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {report}
+          </ReactMarkdown>
+        </div>
+      ) : tab === "module" ? (
+        <div className="mt-2 border-t border-border pt-2">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {moduleDoc}
           </ReactMarkdown>
         </div>
       ) : (

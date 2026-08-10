@@ -66,6 +66,22 @@ func NewRouter(healthHandler *handler.HealthHandler, handlers *handler.Handlers,
 			r.Get("/stats/week", handlers.Stats.Week)
 			r.Get("/levels/current", handlers.Stats.Level)
 			r.Get("/analytics/overview", handlers.Stats.Analytics)
+
+			r.Route("/experiments", func(r chi.Router) {
+				r.Post("/", handlers.Experiments.Create)
+				r.Get("/", handlers.Experiments.List)
+				r.Get("/{experimentID}", handlers.Experiments.Detail)
+				r.Patch("/{experimentID}", handlers.Experiments.Update)
+				r.Delete("/{experimentID}", handlers.Experiments.Delete)
+				r.Post("/{experimentID}/versions", handlers.Experiments.Fork)
+				r.Get("/{experimentID}/versions/{versionID}", handlers.Experiments.VersionDetail)
+				r.Patch("/{experimentID}/versions/{versionID}", handlers.Experiments.UpdateVersion)
+				r.Delete("/{experimentID}/versions/{versionID}", handlers.Experiments.DeleteVersion)
+				r.Post("/{experimentID}/versions/{versionID}/start", handlers.Experiments.Start)
+				r.Put("/{experimentID}/versions/{versionID}/checkins/{day}", handlers.Experiments.UpsertCheckin)
+				r.Delete("/{experimentID}/versions/{versionID}/checkins/{day}", handlers.Experiments.DeleteCheckin)
+				r.Post("/{experimentID}/versions/{versionID}/reflection", handlers.Experiments.Reflection)
+			})
 		})
 	})
 

@@ -28,3 +28,26 @@ export const theoryToc: Record<"ru" | "en", { id: string; title: string }[]> = {
     { id: "examples-and-templates", title: "Examples & Templates" },
   ],
 }
+
+export const moduleToc: Record<"ru" | "en", { id: string; title: string }[]> = {
+  ru: [
+    { id: "что-это", title: "Что это" },
+    { id: "семья-и-версии", title: "Семья и версии" },
+    { id: "метрики", title: "Метрики" },
+    { id: "baseline", title: "Baseline" },
+    { id: "чек-ин", title: "Чек-ин" },
+    { id: "жизненный-цикл-версии", title: "Жизненный цикл версии" },
+    { id: "результаты-и-вердикт", title: "Результаты и вердикт" },
+    { id: "сравнение-версий", title: "Сравнение версий" },
+  ],
+  en: [
+    { id: "concept", title: "Concept" },
+    { id: "family-and-versions", title: "Family and versions" },
+    { id: "metrics", title: "Metrics" },
+    { id: "baseline", title: "Baseline" },
+    { id: "check-in", title: "Check-in" },
+    { id: "version-lifecycle", title: "Version lifecycle" },
+    { id: "results-and-verdict", title: "Results and verdict" },
+    { id: "comparing-versions", title: "Comparing versions" },
+  ],
+}

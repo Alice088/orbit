@@ -88,6 +88,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 const get = <T>(path: string) => request<T>(path)
 const post = <T>(path: string, body?: unknown) =>
   request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) })
+const put = <T>(path: string, body?: unknown) =>
+  request<T>(path, { method: "PUT", body: body === undefined ? undefined : JSON.stringify(body) })
 const del = <T>(path: string) => request<T>(path, { method: "DELETE" })
 
 export interface Milestone {
@@ -215,6 +217,126 @@ export interface Page<T> {
   total: number
 }
 
+export type MetricType = "count" | "duration" | "rate" | "score" | "binary" | "note"
+
+export interface MetricInput {
+  name: string
+  type: MetricType
+  unit?: string
+  direction?: string
+  is_primary: boolean
+  baseline_source?: string
+  baseline_value?: number
+  baseline_denom?: number
+}
+
+export interface MetricStats {
+  average?: number
+  min?: number
+  max?: number
+  change_pct?: number
+  trend_better?: boolean
+  consistency: number
+  value_count: number
+}
+
+export interface Metric {
+  id: string
+  name: string
+  type: MetricType
+  unit?: string
+  direction?: string
+  is_primary: boolean
+  baseline_source: string
+  baseline_value?: number
+  baseline_denom?: number
+  suggested_baseline?: number
+  stats?: MetricStats
+}
+
+export interface CheckinValue {
+  metric_id: string
+  num_value?: number
+  denom_value?: number
+  text_value?: string
+}
+
+export interface Checkin {
+  id: string
+  day: string
+  note: string
+  values: CheckinValue[]
+}
+
+export interface Verdict {
+  primary_metric_id: string
+  metric_name: string
+  change_pct?: number
+  outcome: "improved" | "worsened" | "neutral" | "no_baseline" | "no_data"
+}
+
+export interface PrimarySummary {
+  metric_name: string
+  average?: number
+  change_pct?: number
+  consistency: number
+}
+
+export type VersionStatus = "draft" | "running" | "ended" | "completed" | "aborted"
+
+export interface ExperimentVersion {
+  id: string
+  experiment_id: string
+  version_number: number
+  change: string
+  success_criteria: string
+  duration_days: number
+  status: VersionStatus
+  started_at?: string
+  completed_at?: string
+  reflection: string
+  day_index: number
+  days_left: number
+  metrics: Metric[]
+  checkins: Checkin[]
+  verdict?: Verdict
+  is_best: boolean
+  primary_summary?: PrimarySummary
+}
+
+export interface VersionSummary {
+  id: string
+  version_number: number
+  change: string
+  status: VersionStatus
+  duration_days: number
+  day_index: number
+  days_left: number
+  primary_summary?: PrimarySummary
+  is_best: boolean
+  is_current: boolean
+}
+
+export interface Best {
+  version_id: string
+  change_pct?: number
+}
+
+export interface Experiment {
+  id: string
+  title: string
+  category: string
+  tags: string[]
+  created_at: string
+  active_count: number
+  completed_count: number
+  aborted_count: number
+  total_versions: number
+  current?: VersionSummary
+  best?: Best
+  versions: VersionSummary[]
+}
+
 export interface Completion {
   gpp: number
   xp: number
@@ -291,5 +413,56 @@ export const api = {
   penalties: {
     add: (body: { amount: number; reason: string; currency: string; goal_id?: string }) =>
       post<void>("/v1/penalties", body),
+  },
+
+  experiments: {
+    list: () => get<Experiment[]>("/v1/experiments"),
+    create: (body: {
+      title: string
+      category: string
+      tags: string[]
+      change: string
+      success_criteria: string
+      duration_days: number
+      metrics: MetricInput[]
+    }) => post<Experiment>("/v1/experiments", body),
+    detail: (id: string) => get<Experiment>(`/v1/experiments/${id}`),
+    update: (id: string, body: { title: string; category: string; tags: string[] }) =>
+      request<void>(`/v1/experiments/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    remove: (id: string) => del<void>(`/v1/experiments/${id}`),
+    fork: (id: string) => post<ExperimentVersion>(`/v1/experiments/${id}/versions`),
+    version: (id: string, versionId: string) =>
+      get<ExperimentVersion>(`/v1/experiments/${id}/versions/${versionId}`),
+    updateVersion: (
+      id: string,
+      versionId: string,
+      body: {
+        change: string
+        success_criteria: string
+        duration_days: number
+        metrics: MetricInput[]
+      },
+    ) =>
+      request<void>(`/v1/experiments/${id}/versions/${versionId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    deleteVersion: (id: string, versionId: string) =>
+      del<void>(`/v1/experiments/${id}/versions/${versionId}`),
+    start: (id: string, versionId: string) =>
+      post<ExperimentVersion>(`/v1/experiments/${id}/versions/${versionId}/start`),
+    upsertCheckin: (
+      id: string,
+      versionId: string,
+      day: string,
+      body: { values: CheckinValue[]; note: string },
+    ) =>
+      put<ExperimentVersion>(`/v1/experiments/${id}/versions/${versionId}/checkins/${day}`, body),
+    deleteCheckin: (id: string, versionId: string, day: string) =>
+      del<void>(`/v1/experiments/${id}/versions/${versionId}/checkins/${day}`),
+    reflection: (id: string, versionId: string, reflection: string) =>
+      post<ExperimentVersion>(`/v1/experiments/${id}/versions/${versionId}/reflection`, {
+        reflection,
+      }),
   },
 }

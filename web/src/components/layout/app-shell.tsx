@@ -7,6 +7,7 @@ import {
   BarChart3,
   BookOpen,
   Coins,
+  FlaskConical,
   LayoutDashboard,
   ListChecks,
   Menu,
@@ -22,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { useQuery } from "@tanstack/react-query"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { api } from "@/lib/api"
-import { implGroups, theoryToc } from "@/lib/docs-data"
+import { implGroups, moduleToc, theoryToc } from "@/lib/docs-data"
 import { useSearchParams } from "react-router-dom"
 import { isEn, setLanguage } from "@/lib/i18n"
 import { useEffect } from "react"
@@ -35,6 +36,7 @@ const navGroups = [
       { to: "/goals", label: "nav.goals", icon: Target },
       { to: "/tasks", label: "nav.tasks", icon: ListChecks },
       { to: "/habits", label: "nav.habits", icon: Repeat },
+      { to: "/experiments", label: "nav.experiments", icon: FlaskConical },
     ],
   },
   {
@@ -59,6 +61,7 @@ const pageTitleKeys: Record<string, string> = {
   "/goals": "nav.goals",
   "/tasks": "nav.tasks",
   "/habits": "nav.habits",
+  "/experiments": "nav.experiments",
   "/activity": "nav.activity",
   "/points": "nav.points",
   "/analytics": "nav.analytics",
@@ -105,7 +108,8 @@ function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useTranslation()
-  const tab: "theory" | "impl" = searchParams.get("t") === "impl" ? "impl" : "theory"
+  const tab: "theory" | "impl" | "module" =
+    searchParams.get("t") === "impl" ? "impl" : searchParams.get("t") === "module" ? "module" : "theory"
   const hash = decodeURIComponent(location.hash.slice(1))
 
   const goSection = (id: string) => {
@@ -114,9 +118,9 @@ function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
-  const switchTab = (t: "theory" | "impl") => {
+  const switchTab = (t: "theory" | "impl" | "module") => {
     onNavigate?.()
-    navigate(t === "impl" ? "/docs?t=impl" : "/docs", { replace: false })
+    navigate(t === "impl" ? "/docs?t=impl" : t === "module" ? "/docs?t=module" : "/docs", { replace: false })
     window.scrollTo({ top: 0 })
   }
 
@@ -140,12 +144,12 @@ function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
         <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
           {t("docs.documentation")}
         </p>
-        <div className="mt-1 flex gap-1 px-1">
+        <div className="mt-1 flex flex-col gap-1 px-1">
           <button
             type="button"
             onClick={() => switchTab("theory")}
             className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
+              "rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors",
               tab === "theory"
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/60",
@@ -157,13 +161,25 @@ function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
             type="button"
             onClick={() => switchTab("impl")}
             className={cn(
-              "flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
+              "rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors",
               tab === "impl"
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
                 : "text-sidebar-foreground hover:bg-sidebar-accent/60",
             )}
           >
             {t("docs.implementation")}
+          </button>
+          <button
+            type="button"
+            onClick={() => switchTab("module")}
+            className={cn(
+              "rounded-md px-2 py-1.5 text-left text-sm font-medium transition-colors",
+              tab === "module"
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+            )}
+          >
+            {t("docs.module")}
           </button>
         </div>
       </div>
@@ -174,6 +190,27 @@ function DocsNav({ onNavigate }: { onNavigate?: () => void }) {
             {t("docs.sections")}
           </p>
           {toc.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => goSection(item.id)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-left text-sm font-medium transition-colors",
+                hash === item.id
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent/60",
+              )}
+            >
+              {item.title}
+            </button>
+          ))}
+        </div>
+      ) : tab === "module" ? (
+        <div className="flex flex-col gap-1">
+          <p className="px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
+            {t("docs.sections")}
+          </p>
+          {moduleToc[isEn() ? "en" : "ru"].map((item) => (
             <button
               key={item.id}
               type="button"

@@ -11,6 +11,9 @@ import HabitsPage from "@/pages/habits"
 import ActivityPage from "@/pages/activity"
 import PointsPage from "@/pages/points"
 import AnalyticsPage from "@/pages/analytics"
+import ExperimentsPage from "@/pages/experiments"
+import ExperimentDetailPage from "@/pages/experiment-detail"
+import VersionDetailPage from "@/pages/version-detail"
 import DocsPage from "@/pages/docs"
 import SettingsPage from "@/pages/settings"
 
@@ -87,6 +90,9 @@ export default function App() {
           <Route path="activity" element={<ActivityPage />} />
           <Route path="points" element={<PointsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="experiments" element={<ExperimentsPage />} />
+          <Route path="experiments/:experimentId" element={<ExperimentDetailPage />} />
+          <Route path="experiments/:experimentId/versions/:versionId" element={<VersionDetailPage />} />
           <Route path="docs" element={<DocsPage />} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
